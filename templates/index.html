@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yapılacaklar</title>
+    <title>Tasks</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -396,7 +396,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Yapılacaklar</h1>
+            <h1>Tasks</h1>
             <button class="theme-toggle" onclick="toggleTheme()">
                 <i class="fas fa-moon"></i>
             </button>
@@ -405,12 +405,12 @@
         <form action="{{ url_for('add') }}" method="POST">
             <div class="input-group">
                 <div class="task-input-group">
-                    <input type="text" name="title" class="task-input" placeholder="Görev başlığı..." required>
-                    <textarea name="description" class="task-description" placeholder="Görev açıklaması (isteğe bağlı)..."></textarea>
-                    <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Son tarih (isteğe bağlı)">
+                    <input type="text" name="title" class="task-input" placeholder="Task title..." required>
+                    <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
+                    <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
                 </div>
                 <button type="submit" class="add-button">
-                    <i class="fas fa-plus"></i> Ekle
+                    <i class="fas fa-plus"></i> Add
                 </button>
             </div>
         </form>
@@ -463,7 +463,7 @@
                 {% endfor %}
             {% else %}
                 <div class="empty-state">
-                    Henüz görev eklenmemiş
+                    No tasks added yet
                 </div>
             {% endif %}
         </div>

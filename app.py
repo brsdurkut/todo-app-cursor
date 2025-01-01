@@ -25,11 +25,11 @@ def get_todos():
             sorts=[
                 {
                     "property": "Status",
-                    "direction": "ascending"  # Önce tamamlanmamış görevler
+                    "direction": "ascending"  # Show uncompleted tasks first
                 },
                 {
                     "property": "Order",
-                    "direction": "ascending"  # Sonra sıra numarasına göre
+                    "direction": "ascending"  # Then sort by order
                 }
             ],
             filter={
@@ -81,7 +81,7 @@ def create_todo(title, description="", deadline=None):
             }
         }
 
-        # Deadline varsa ekle
+        # Add deadline if exists
         if deadline:
             properties["Deadline"] = {
                 "date": {
@@ -130,16 +130,16 @@ def reorder():
 
 def toggle_todo(page_id):
     try:
-        # Mevcut durumu al
+        # Get current status
         page = notion.pages.retrieve(page_id=page_id)
         current_status = page['properties']['Status']['checkbox']
         
-        # Yeni durumu belirle
+        # Determine new status
         new_status = not current_status
         
-        # Eğer görev tamamlandıysa, en yüksek sıra numarasını bul ve onun üzerine ekle
+        # If task is completed, find the highest order number and add to it
         new_order = None
-        if new_status:  # Görev tamamlandıysa
+        if new_status:  # If task is completed
             todos = get_todos()
             max_order = 0
             for todo in todos:
@@ -147,14 +147,14 @@ def toggle_todo(page_id):
                 max_order = max(max_order, current_order or 0)
             new_order = max_order + 1000
 
-        # Güncelleme yap
+        # Update properties
         properties = {
             "Status": {
                 "checkbox": new_status
             }
         }
         
-        # Eğer yeni sıra numarası belirlendiyse ekle
+        # Add new order if determined
         if new_order is not None:
             properties["Order"] = {
                 "number": new_order
@@ -182,11 +182,11 @@ def delete_todo(page_id):
 
 def get_page_info(page_id):
     try:
-        # Önce sayfanın kendisini al
+        # First, retrieve the page itself
         page = notion.pages.retrieve(page_id=page_id)
         print(f"Retrieved page data: {page}")
         
-        # Başlığı bul
+        # Find the title
         title = ""
         if 'properties' in page:
             for prop in page['properties'].values():
@@ -196,7 +196,7 @@ def get_page_info(page_id):
                         title = title_parts[0].get('plain_text', '')
                         break
 
-        # Sayfa içeriğini al
+        # Get the page content
         blocks = notion.blocks.children.list(block_id=page_id)
         print(f"Retrieved blocks: {blocks}")
         
@@ -234,7 +234,7 @@ def get_page_info(page_id):
                 if text_content:
                     preview_text.append(f"1. {text_content[0].get('plain_text', '')}")
 
-            # En fazla 5 blok al
+            # Max 5 blocks
             if len(preview_text) >= 5:
                 break
 
@@ -248,9 +248,9 @@ def get_page_info(page_id):
 
 def extract_page_id_from_url(url):
     try:
-        # URL'nin sonundaki ID'yi al
+        # Get the ID at the end of the URL
         page_id = url.split('-')[-1].split('?')[0]
-        # ID'yi Notion'ın beklediği formata çevir (8-4-4-4-12)
+        # Convert the ID to the format Notion expects (8-4-4-4-12)
         if len(page_id) == 32:
             return f"{page_id[:8]}-{page_id[8:12]}-{page_id[12:16]}-{page_id[16:20]}-{page_id[20:]}"
         return None
@@ -276,7 +276,6 @@ def index():
             deadline = todo['properties'].get('Deadline', {}).get('date', {})
             deadline_date = None
             if deadline and deadline.get('start'):
-                # Notion'dan gelen tarihi UTC olarak parse et
                 deadline_date = datetime.fromisoformat(deadline['start'].replace('Z', '+00:00')).astimezone(pytz.UTC)
             
             # Get category information from mention
@@ -322,7 +321,7 @@ def add():
     
     if title:
         if deadline:
-            # Yerel saat diliminden gelen tarihi UTC'ye çevir
+            # Convert local time to UTC
             local_dt = datetime.fromisoformat(deadline)
             utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
             create_todo(title, description, utc_dt)
