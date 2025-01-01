@@ -15,8 +15,8 @@ A Flask-based todo application integrated with Notion API.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/todo-app.git
-cd todo-app
+git clone https://github.com/brsdurkut/todo-app-cursor.git
+cd todo-app-cursor
 ```
 
 2. Install required packages:
