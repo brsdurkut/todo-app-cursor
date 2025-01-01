@@ -1,0 +1,6 @@
+Flask==2.2.5
+Flask-SQLAlchemy==3.0.2
+SQLAlchemy==1.4.41
+notion-client==1.0.0
+python-dotenv==0.21.1
+pytz==2023.3 

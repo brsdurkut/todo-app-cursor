@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yapılacaklar</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            /* Light theme variables */
+            --background: #F2F2F7;
+            --card-background: #FFFFFF;
+            --text-primary: #000000;
+            --text-secondary: #8E8E93;
+            --border-color: #E5E5EA;
+            --system-blue: #007AFF;
+            --system-green: #34C759;
+            --system-red: #FF3B30;
+            --system-gray: #8E8E93;
+            --hover-background: #F9F9F9;
+        }
+
+        [data-theme="dark"] {
+            /* Dark theme variables */
+            --background: #1C1C1E;
+            --card-background: #2C2C2E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #98989D;
+            --border-color: #38383A;
+            --system-blue: #0A84FF;
+            --system-green: #30D158;
+            --system-red: #FF453A;
+            --system-gray: #98989D;
+            --hover-background: #3C3C3E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--background);
+            color: var(--text-primary);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            transition: background-color 0.3s ease;
+        }
+
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 0.5rem;
+            font-size: 1.25rem;
+            transition: opacity 0.2s;
+        }
+
+        .theme-toggle:hover {
+            opacity: 0.8;
+        }
+
+        .input-group {
+            background: var(--card-background);
+            border-radius: 10px;
+            padding: 0.75rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .task-input, .task-description, .deadline-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: var(--card-background);
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-family: inherit;
+        }
+
+        .task-input:focus, .task-description:focus, .deadline-input:focus {
+            outline: none;
+            border-color: var(--system-blue);
+        }
+
+        .todo-list {
+            background: var(--card-background);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        .todo-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background-color 0.2s;
+            cursor: move;
+            user-select: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .todo-item:last-child {
+            border-bottom: none;
+        }
+
+        .todo-item:hover {
+            background-color: var(--hover-background);
+        }
+
+        .todo-title {
+            color: var(--text-primary);
+        }
+
+        .todo-description {
+            color: var(--text-secondary);
+        }
+
+        .todo-date, .todo-meta {
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            color: var(--text-secondary);
+        }
+
+        .task-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .task-description {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #E5E5EA;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .task-description:focus {
+            outline: none;
+            border-color: var(--system-blue);
+        }
+
+        .todo-description {
+            font-size: 0.9rem;
+            color: var(--system-gray);
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+        }
+
+        .todo-content {
+            flex-grow: 1;
+            margin-right: 1rem;
+        }
+
+        .todo-title {
+            font-size: 1rem;
+            color: #000000;
+            margin-bottom: 0.25rem;
+            word-wrap: break-word;
+        }
+
+        .todo-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.25rem;
+            font-size: 0.85rem;
+            color: var(--system-gray);
+            position: relative;
+            z-index: 2;
+        }
+
+        .todo-category {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            background-color: var(--hover-background);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--system-blue);
+            position: relative;
+            cursor: help;
+        }
+
+        .todo-category i {
+            margin-right: 0.35rem;
+            font-size: 0.8rem;
+        }
+
+        .tooltip-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .category-tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.85);
+            color: white;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            padding: 0.75rem;
+            width: max-content;
+            max-width: 300px;
+            min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            text-align: left;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-word;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            pointer-events: none;
+        }
+
+        .category-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+        }
+
+        .todo-category:hover .category-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* JavaScript ile tooltip pozisyonunu ayarlamak için */
+        .todo-category:hover .tooltip-container {
+            display: block;
+        }
+
+        .deadline-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #E5E5EA;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .deadline-input:focus {
+            outline: none;
+            border-color: var(--system-blue);
+        }
+
+        .todo-deadline {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--system-gray);
+        }
+
+        .todo-deadline.urgent {
+            color: var(--system-red);
+        }
+
+        .todo-deadline.upcoming {
+            color: var(--system-blue);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .add-button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--system-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .add-button:hover {
+            opacity: 0.9;
+        }
+
+        .completed .todo-title {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn {
+            padding: 0.5rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            color: white;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-complete {
+            background-color: var(--system-green);
+        }
+
+        .btn-delete {
+            background-color: var(--system-red);
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .todo-item.dragging {
+            opacity: 0.5;
+            background-color: var(--background);
+        }
+
+        .todo-item.drag-over {
+            border-top: 2px solid var(--system-blue);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+                margin-bottom: 0;
+            }
+        }
+
+        /* Placeholder styles for dark mode */
+        .task-input::placeholder,
+        .task-description::placeholder,
+        .deadline-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        /* Category styles update */
+        .todo-category {
+            background-color: var(--hover-background);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Yapılacaklar</h1>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+        
+        <form action="{{ url_for('add') }}" method="POST">
+            <div class="input-group">
+                <div class="task-input-group">
+                    <input type="text" name="title" class="task-input" placeholder="Görev başlığı..." required>
+                    <textarea name="description" class="task-description" placeholder="Görev açıklaması (isteğe bağlı)..."></textarea>
+                    <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Son tarih (isteğe bağlı)">
+                </div>
+                <button type="submit" class="add-button">
+                    <i class="fas fa-plus"></i> Ekle
+                </button>
+            </div>
+        </form>
+
+        <div class="todo-list" id="todoList">
+            {% if todos %}
+                {% for todo in todos %}
+                <div class="todo-item {% if todo.completed %}completed{% endif %}" 
+                     draggable="true"
+                     data-id="{{ todo.id }}">
+                    <div class="todo-content">
+                        <div class="todo-title">{{ todo.title }}</div>
+                        {% if todo.description %}
+                        <div class="todo-description">{{ todo.description }}</div>
+                        {% endif %}
+                        <div class="todo-meta">
+                            <div class="todo-date">{{ todo.created_at.strftime('%d %B %Y, %H:%M') }}</div>
+                            {% if todo.deadline %}
+                            <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
+                                <i class="fas fa-clock"></i>
+                                <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
+                            </div>
+                            {% endif %}
+                            {% if todo.category %}
+                            <div class="todo-category" data-tooltip-text="{{ todo.category_preview }}">
+                                <i class="fas fa-folder"></i>
+                                <span>{{ todo.category }}</span>
+                                <div class="tooltip-container">
+                                    <div class="category-tooltip">
+                                        <strong>{{ todo.category }}</strong>
+                                        {% if todo.category_preview %}
+                                        <br><br>
+                                        {{ todo.category_preview }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <a href="{{ url_for('complete', id=todo.id) }}" class="btn btn-complete">
+                            <i class="fas fa-check"></i>
+                        </a>
+                        <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    Henüz görev eklenmemiş
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // Tooltip positioning
+        document.addEventListener('DOMContentLoaded', function() {
+            const categories = document.querySelectorAll('.todo-category');
+            
+            categories.forEach(category => {
+                const tooltip = category.querySelector('.category-tooltip');
+                
+                category.addEventListener('mouseenter', () => {
+                    const rect = category.getBoundingClientRect();
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    
+                    // Tooltip'i kategorinin üzerine konumlandır
+                    tooltip.style.left = rect.left + (rect.width / 2) + 'px';
+                    tooltip.style.top = rect.top - 10 + 'px';
+                    tooltip.style.transform = 'translate(-50%, -100%)';
+                });
+            });
+        });
+
+        // Theme toggle functionality
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update icon
+            const themeIcon = document.querySelector('.theme-toggle i');
+            themeIcon.className = newTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Set initial theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            
+            // Set initial icon
+            const themeIcon = document.querySelector('.theme-toggle i');
+            themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const todoList = document.getElementById('todoList');
+            let draggingElement = null;
+
+            // Tüm todo öğelerine drag & drop event listener'ları ekle
+            document.querySelectorAll('.todo-item').forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragenter', handleDragEnter);
+                item.addEventListener('dragleave', handleDragLeave);
+            });
+
+            function handleDragStart(e) {
+                draggingElement = this;
+                this.classList.add('dragging');
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.todo-item').forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+            }
+
+            function handleDragEnter(e) {
+                e.preventDefault();
+                if (this !== draggingElement) {
+                    this.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                if (this === draggingElement) return;
+
+                let allItems = [...todoList.querySelectorAll('.todo-item')];
+                const draggingIndex = allItems.indexOf(draggingElement);
+                const dropIndex = allItems.indexOf(this);
+
+                if (draggingIndex > dropIndex) {
+                    this.parentNode.insertBefore(draggingElement, this);
+                } else {
+                    this.parentNode.insertBefore(draggingElement, this.nextSibling);
+                }
+
+                // Yeni sıralamayı sunucuya gönder
+                const newOrder = [...todoList.querySelectorAll('.todo-item')].map(item => item.dataset.id);
+                updateOrder(newOrder);
+            }
+
+            function updateOrder(newOrder) {
+                fetch('/reorder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        todos: newOrder
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        console.error('Error updating order:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
