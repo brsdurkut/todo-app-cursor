@@ -55,9 +55,12 @@ pip install -r requirements.txt
 
 3. Create a `.env` file in the root directory and add your credentials:
 ```env
+# Required
 NOTION_TOKEN=your_notion_integration_token
 NOTION_DATABASE_ID=your_database_id
-FLASK_SECRET_KEY=your_secret_key_here
+
+# Optional - for additional security
+FLASK_SECRET_KEY=your_secret_key_here  # Optional, defaults to a secure value if not set
 ```
 
 4. Set up Notion Integration:
