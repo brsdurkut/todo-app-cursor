@@ -45,7 +45,18 @@ def get_todos():
         print(f"Error fetching todos: {e}")
         return []
 
-def create_todo(title, description="", deadline=None):
+def get_categories():
+    try:
+        # Query the database to get its properties
+        database = notion.databases.retrieve(database_id=DATABASE_ID)
+        # Get the category options from the select property
+        category_options = database.get('properties', {}).get('Category', {}).get('select', {}).get('options', [])
+        return [{'id': option.get('id'), 'name': option.get('name')} for option in category_options]
+    except Exception as e:
+        print(f"Error fetching categories: {e}")
+        return []
+
+def create_todo(title, description="", deadline=None, category_name=None):
     try:
         # Get the current maximum order
         todos = get_todos()
@@ -81,6 +92,14 @@ def create_todo(title, description="", deadline=None):
             }
         }
 
+        # Add category if provided
+        if category_name:
+            properties["Category"] = {
+                "select": {
+                    "name": category_name
+                }
+            }
+
         # Add deadline if exists
         if deadline:
             properties["Deadline"] = {
@@ -113,6 +132,106 @@ def update_todo_order(page_id, new_order):
         print(f"Error updating todo order: {e}")
         return False
 
+def update_todo_category(page_id, new_category):
+    try:
+        properties = {
+            "Category": {
+                "select": {
+                    "name": new_category
+                } if new_category != "Uncategorized" else None
+            }
+        }
+        notion.pages.update(
+            page_id=page_id,
+            properties=properties
+        )
+        return True
+    except Exception as e:
+        print(f"Error updating todo category: {e}")
+        return False
+
+def update_todo_completion(page_id, is_completed, completion_date=None):
+    try:
+        properties = {
+            "Status": {
+                "checkbox": is_completed
+            }
+        }
+        
+        if is_completed and completion_date:
+            properties["CompletedAt"] = {
+                "date": {
+                    "start": completion_date.isoformat()
+                }
+            }
+        elif not is_completed:
+            properties["CompletedAt"] = None
+            
+        notion.pages.update(
+            page_id=page_id,
+            properties=properties
+        )
+        return True
+    except Exception as e:
+        print(f"Error updating todo completion: {e}")
+        return False
+
+def update_todo(page_id, title, description="", deadline=None, category_name=None):
+    try:
+        properties = {
+            "Title": {
+                "title": [
+                    {
+                        "text": {
+                            "content": title
+                        }
+                    }
+                ]
+            },
+            "Description": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": description
+                        }
+                    }
+                ]
+            }
+        }
+
+        # Update category if provided
+        if category_name:
+            properties["Category"] = {
+                "select": {
+                    "name": category_name
+                }
+            }
+        elif category_name == "":  # Explicitly remove category
+            properties["Category"] = {
+                "select": None
+            }
+
+        # Update deadline if provided
+        if deadline:
+            properties["Deadline"] = {
+                "date": {
+                    "start": deadline
+                }
+            }
+        elif deadline == "":  # Explicitly remove deadline
+            properties["Deadline"] = {
+                "date": None
+            }
+
+        notion.pages.update(
+            page_id=page_id,
+            properties=properties
+        )
+        return True
+    except Exception as e:
+        print(f"Error updating todo: {e}")
+        return False
+
 @app.route('/reorder', methods=['POST'])
 def reorder():
     try:
@@ -130,16 +249,17 @@ def reorder():
 
 def toggle_todo(page_id):
     try:
-        # Get current status
+        # Get current status and current date
         page = notion.pages.retrieve(page_id=page_id)
         current_status = page['properties']['Status']['checkbox']
+        now = get_utc_now()
         
         # Determine new status
         new_status = not current_status
         
         # If task is completed, find the highest order number and add to it
         new_order = None
-        if new_status:  # If task is completed
+        if new_status:  # If task is being completed
             todos = get_todos()
             max_order = 0
             for todo in todos:
@@ -147,19 +267,39 @@ def toggle_todo(page_id):
                 max_order = max(max_order, current_order or 0)
             new_order = max_order + 1000
 
-        # Update properties
+        # Prepare properties update
         properties = {
             "Status": {
+                "type": "checkbox",
                 "checkbox": new_status
             }
         }
         
+        if new_status:
+            # If task is being completed, set completion date to now
+            properties["CompletedAt"] = {
+                "type": "date",
+                "date": {
+                    "start": now.isoformat()
+                }
+            }
+        else:
+            # If task is being uncompleted:
+            # 1. Remove completion date
+            # 2. Move task to today by updating CompletedAt to None
+            properties["CompletedAt"] = {
+                "type": "date",
+                "date": None
+            }
+        
         # Add new order if determined
         if new_order is not None:
             properties["Order"] = {
+                "type": "number",
                 "number": new_order
             }
 
+        # Update the page
         notion.pages.update(
             page_id=page_id,
             properties=properties
@@ -261,8 +401,12 @@ def extract_page_id_from_url(url):
 @app.route('/')
 def index():
     todos = get_todos()
-    formatted_todos = []
+    categories = get_categories()
     now = get_utc_now()
+    today = now.date()
+    
+    # Dictionary to store todos grouped by day and category
+    grouped_todos = {}
     
     for todo in todos:
         try:
@@ -278,55 +422,89 @@ def index():
             if deadline and deadline.get('start'):
                 deadline_date = datetime.fromisoformat(deadline['start'].replace('Z', '+00:00')).astimezone(pytz.UTC)
             
-            # Get category information from mention
-            category_info = {'title': '', 'preview': ''}
-            category_text = todo['properties'].get('Category', {}).get('rich_text', [])
-            if category_text and len(category_text) > 0:
-                mention_data = category_text[0]
-                if mention_data.get('type') == 'mention' and mention_data.get('mention', {}).get('type') == 'page':
-                    category_title = mention_data.get('plain_text', '')
-                    page_id = mention_data['mention']['page']['id']
-                    
-                    if page_id:
-                        print(f"Fetching info for category page: {page_id}")
-                        category_info = get_page_info(page_id)
-                        if not category_info['title']:
-                            category_info['title'] = category_title
-                        print(f"Category info found: {category_info}")
+            # Get category from select field
+            category = todo['properties'].get('Category', {}).get('select', {})
+            category_name = category.get('name', '') if category else 'Uncategorized'
             
+            # Get completion status and date
+            is_completed = todo['properties'].get('Status', {}).get('checkbox', False)
+            completed_at = todo['properties'].get('CompletedAt', {}).get('date', {})
+            completed_date = None
+            if completed_at and completed_at.get('start'):
+                completed_date = datetime.fromisoformat(completed_at['start'].replace('Z', '+00:00')).astimezone(pytz.UTC)
+            
+            # Format the todo
             formatted_todo = {
                 'id': todo['id'],
                 'title': title_content,
                 'description': description_content,
-                'category': category_info['title'],
-                'category_preview': category_info['preview'],
-                'completed': todo['properties'].get('Status', {}).get('checkbox', False),
+                'category': category_name,
+                'completed': is_completed,
                 'created_at': datetime.fromisoformat(todo['created_time'].replace('Z', '+00:00')).astimezone(pytz.UTC),
+                'completed_at': completed_date,
                 'deadline': deadline_date,
                 'order': todo['properties'].get('Order', {}).get('number', 0)
             }
-            formatted_todos.append(formatted_todo)
-            print("Formatted todo:", formatted_todo)
+            
+            # Determine which day to show the todo
+            if is_completed and completed_date:
+                display_date = completed_date.date()
+            else:
+                display_date = today
+            
+            day_str = display_date.strftime('%Y-%m-%d')
+            
+            # Initialize the day if it doesn't exist
+            if day_str not in grouped_todos:
+                grouped_todos[day_str] = {
+                    'date': display_date,
+                    'categories': {}
+                }
+            
+            # Initialize the category if it doesn't exist for this day
+            if category_name not in grouped_todos[day_str]['categories']:
+                grouped_todos[day_str]['categories'][category_name] = []
+            
+            # Add the todo to its category within the day
+            grouped_todos[day_str]['categories'][category_name].append(formatted_todo)
+            
         except Exception as e:
             print(f"Error formatting todo: {e}")
             continue
     
-    return render_template('index.html', todos=formatted_todos, now=now)
+    # Sort days in reverse chronological order
+    sorted_days = sorted(grouped_todos.items(), key=lambda x: x[1]['date'], reverse=True)
+    
+    # For each day, sort categories alphabetically and sort todos within categories
+    for day_str, day_data in grouped_todos.items():
+        # Sort categories alphabetically
+        day_data['categories'] = dict(sorted(day_data['categories'].items()))
+        
+        # Sort todos within each category
+        for category in day_data['categories'].values():
+            category.sort(key=lambda x: (
+                x['completed'],
+                x['deadline'] if x['deadline'] else datetime.max.replace(tzinfo=pytz.UTC),
+                x['completed_at'] if x['completed_at'] else x['created_at']
+            ))
+    
+    return render_template('index.html', grouped_todos=sorted_days, categories=categories, now=now)
 
 @app.route('/add', methods=['POST'])
 def add():
     title = request.form.get('title')
     description = request.form.get('description', '')
     deadline = request.form.get('deadline', '')
+    category = request.form.get('category', '')
     
     if title:
         if deadline:
             # Convert local time to UTC
             local_dt = datetime.fromisoformat(deadline)
             utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
-            create_todo(title, description, utc_dt)
+            create_todo(title, description, utc_dt, category if category else None)
         else:
-            create_todo(title, description, None)
+            create_todo(title, description, None, category if category else None)
     return redirect(url_for('index'))
 
 @app.route('/complete/<string:id>')
@@ -337,6 +515,50 @@ def complete(id):
 @app.route('/delete/<string:id>')
 def delete(id):
     delete_todo(id)
+    return redirect(url_for('index'))
+
+@app.route('/move', methods=['POST'])
+def move_todo():
+    try:
+        data = request.get_json()
+        todo_id = data.get('todoId')
+        new_category = data.get('newCategory')
+        new_date = data.get('newDate')
+        is_completed = data.get('isCompleted', False)
+        
+        success = True
+        
+        # Update category if changed
+        if new_category is not None:
+            success = success and update_todo_category(todo_id, new_category)
+        
+        # Update completion status and date if changed
+        if new_date is not None:
+            completion_date = datetime.fromisoformat(new_date) if new_date else None
+            success = success and update_todo_completion(todo_id, is_completed, completion_date)
+        
+        return jsonify({"success": success})
+    except Exception as e:
+        print(f"Error in move_todo: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/edit', methods=['POST'])
+def edit():
+    todo_id = request.form.get('id')
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    deadline = request.form.get('deadline', '')
+    category = request.form.get('category', '')
+    
+    if todo_id and title:
+        if deadline:
+            # Convert local time to UTC
+            local_dt = datetime.fromisoformat(deadline)
+            utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
+            update_todo(todo_id, title, description, utc_dt, category)
+        else:
+            update_todo(todo_id, title, description, "", category)
+            
     return redirect(url_for('index'))
 
 if __name__ == '__main__':

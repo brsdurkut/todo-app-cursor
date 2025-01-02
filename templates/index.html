@@ -210,8 +210,6 @@
             border-radius: 4px;
             font-size: 0.85rem;
             color: var(--system-blue);
-            position: relative;
-            cursor: help;
         }
 
         .todo-category i {
@@ -339,7 +337,7 @@
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s ease;
             color: white;
             width: 32px;
             height: 32px;
@@ -348,16 +346,21 @@
             justify-content: center;
         }
 
+        .btn:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+
+        .btn-undo {
+            background-color: var(--system-blue);
+        }
+
         .btn-complete {
             background-color: var(--system-green);
         }
 
         .btn-delete {
             background-color: var(--system-red);
-        }
-
-        .btn:hover {
-            opacity: 0.9;
         }
 
         .todo-item.dragging {
@@ -391,6 +394,180 @@
         .todo-category {
             background-color: var(--hover-background);
         }
+
+        .day-section {
+            margin-bottom: 2rem;
+        }
+
+        .day-header {
+            margin-bottom: 1rem;
+        }
+
+        .day-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .category-section {
+            background: var(--card-background);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+        }
+
+        .category-header {
+            padding: 0.75rem 1rem;
+            background-color: var(--hover-background);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .category-header h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .category-header i {
+            color: var(--system-blue);
+            font-size: 0.9rem;
+        }
+
+        .todo-time {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .category-select {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: var(--card-background);
+            color: var(--text-primary);
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .category-select:focus {
+            outline: none;
+            border-color: var(--system-blue);
+        }
+
+        .deadline-input {
+            flex: 1;
+        }
+
+        /* Dark mode support for select */
+        .category-select option {
+            background-color: var(--card-background);
+            color: var(--text-primary);
+        }
+
+        .btn-undo {
+            background-color: var(--system-blue);
+        }
+
+        .btn-complete {
+            background-color: var(--system-green);
+        }
+
+        .btn-delete {
+            background-color: var(--system-red);
+        }
+
+        .btn-edit {
+            background-color: var(--system-blue);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: var(--card-background);
+            margin: 15% auto;
+            padding: 1.5rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .close-button:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--system-blue);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-secondary {
+            background-color: var(--hover-background);
+            color: var(--text-primary);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover, .btn-secondary:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -407,7 +584,15 @@
                 <div class="task-input-group">
                     <input type="text" name="title" class="task-input" placeholder="Task title..." required>
                     <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
-                    <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
+                    <div class="form-row">
+                        <select name="category" class="category-select">
+                            <option value="">Select category (optional)</option>
+                            {% for category in categories %}
+                            <option value="{{ category.name }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
+                    </div>
                 </div>
                 <button type="submit" class="add-button">
                     <i class="fas fa-plus"></i> Add
@@ -416,49 +601,61 @@
         </form>
 
         <div class="todo-list" id="todoList">
-            {% if todos %}
-                {% for todo in todos %}
-                <div class="todo-item {% if todo.completed %}completed{% endif %}" 
-                     draggable="true"
-                     data-id="{{ todo.id }}">
-                    <div class="todo-content">
-                        <div class="todo-title">{{ todo.title }}</div>
-                        {% if todo.description %}
-                        <div class="todo-description">{{ todo.description }}</div>
-                        {% endif %}
-                        <div class="todo-meta">
-                            <div class="todo-date">{{ todo.created_at.strftime('%d %B %Y, %H:%M') }}</div>
-                            {% if todo.deadline %}
-                            <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
-                                <i class="fas fa-clock"></i>
-                                <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
-                            </div>
-                            {% endif %}
-                            {% if todo.category %}
-                            <div class="todo-category" data-tooltip-text="{{ todo.category_preview }}">
-                                <i class="fas fa-folder"></i>
-                                <span>{{ todo.category }}</span>
-                                <div class="tooltip-container">
-                                    <div class="category-tooltip">
-                                        <strong>{{ todo.category }}</strong>
-                                        {% if todo.category_preview %}
-                                        <br><br>
-                                        {{ todo.category_preview }}
+            {% if grouped_todos %}
+                {% for day_str, day_data in grouped_todos %}
+                <div class="day-section" data-date="{{ day_str }}" data-completed="{{ 'true' if day_str != now.strftime('%Y-%m-%d') else 'false' }}">
+                    <div class="day-header">
+                        <h2>{{ day_data.date.strftime('%A, %d %B %Y') }}</h2>
+                    </div>
+                    {% for category, todos in day_data.categories.items() %}
+                    <div class="category-section" data-category="{{ category }}">
+                        <div class="category-header">
+                            <h3><i class="fas fa-tag"></i> {{ category }}</h3>
+                        </div>
+                        {% for todo in todos %}
+                        <div class="todo-item {% if todo.completed %}completed{% endif %}" 
+                             draggable="true"
+                             data-id="{{ todo.id }}"
+                             data-category="{{ todo.category }}"
+                             data-date="{{ day_str }}">
+                            <div class="todo-content">
+                                <div class="todo-title">{{ todo.title }}</div>
+                                {% if todo.description %}
+                                <div class="todo-description">{{ todo.description }}</div>
+                                {% endif %}
+                                <div class="todo-meta">
+                                    <div class="todo-time">
+                                        {% if todo.completed %}
+                                            <i class="fas fa-check-circle"></i>
+                                            {{ todo.completed_at.strftime('%H:%M') }}
+                                        {% else %}
+                                            <i class="fas fa-plus-circle"></i>
+                                            {{ todo.created_at.strftime('%H:%M') }}
                                         {% endif %}
                                     </div>
+                                    {% if todo.deadline %}
+                                    <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
+                                        <i class="fas fa-clock"></i>
+                                        <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
-                            {% endif %}
+                            <div class="action-buttons">
+                                <button onclick="openEditModal('{{ todo.id }}', '{{ todo.title }}', '{{ todo.description }}', '{{ todo.category }}', '{{ todo.deadline.isoformat() if todo.deadline else '' }}')" class="btn btn-edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <a href="{{ url_for('complete', id=todo.id) }}" class="btn {% if todo.completed %}btn-undo{% else %}btn-complete{% endif %}">
+                                    <i class="fas {% if todo.completed %}fa-undo{% else %}fa-check{% endif %}"></i>
+                                </a>
+                                <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
                         </div>
+                        {% endfor %}
                     </div>
-                    <div class="action-buttons">
-                        <a href="{{ url_for('complete', id=todo.id) }}" class="btn btn-complete">
-                            <i class="fas fa-check"></i>
-                        </a>
-                        <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
-                            <i class="fas fa-trash"></i>
-                        </a>
-                    </div>
+                    {% endfor %}
                 </div>
                 {% endfor %}
             {% else %}
@@ -469,24 +666,170 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Task</h2>
+                <button onclick="closeEditModal()" class="close-button">&times;</button>
+            </div>
+            <form id="editForm" action="/edit" method="POST">
+                <input type="hidden" id="editTaskId" name="id">
+                <div class="task-input-group">
+                    <input type="text" name="title" id="editTitle" class="task-input" placeholder="Task title..." required>
+                    <textarea name="description" id="editDescription" class="task-description" placeholder="Task description (optional)..."></textarea>
+                    <div class="form-row">
+                        <select name="category" id="editCategory" class="category-select">
+                            <option value="">Select category (optional)</option>
+                            {% for category in categories %}
+                            <option value="{{ category.name }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="datetime-local" name="deadline" id="editDeadline" class="deadline-input" placeholder="Deadline (optional)">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeEditModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
-        // Tooltip positioning
         document.addEventListener('DOMContentLoaded', function() {
-            const categories = document.querySelectorAll('.todo-category');
-            
-            categories.forEach(category => {
-                const tooltip = category.querySelector('.category-tooltip');
-                
-                category.addEventListener('mouseenter', () => {
-                    const rect = category.getBoundingClientRect();
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    
-                    // Tooltip'i kategorinin üzerine konumlandır
-                    tooltip.style.left = rect.left + (rect.width / 2) + 'px';
-                    tooltip.style.top = rect.top - 10 + 'px';
-                    tooltip.style.transform = 'translate(-50%, -100%)';
-                });
+            const todoList = document.getElementById('todoList');
+            let draggingElement = null;
+
+            // Add drag & drop event listeners to todo items
+            document.querySelectorAll('.todo-item').forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
             });
+
+            // Add drag & drop event listeners to category sections
+            document.querySelectorAll('.category-section').forEach(section => {
+                section.addEventListener('dragover', handleDragOver);
+                section.addEventListener('drop', handleDrop);
+                section.addEventListener('dragenter', handleDragEnter);
+                section.addEventListener('dragleave', handleDragLeave);
+            });
+
+            // Add drag & drop event listeners to day sections
+            document.querySelectorAll('.day-section').forEach(section => {
+                section.addEventListener('dragover', handleDragOver);
+                section.addEventListener('drop', handleDrop);
+                section.addEventListener('dragenter', handleDragEnter);
+                section.addEventListener('dragleave', handleDragLeave);
+            });
+
+            function handleDragStart(e) {
+                draggingElement = this;
+                this.classList.add('dragging');
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.category-section, .day-section').forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+            }
+
+            function handleDragEnter(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                
+                if (!draggingElement) return;
+
+                const todoId = draggingElement.dataset.id;
+                let updateData = {};
+                let shouldRefresh = false;
+
+                // Handle category change
+                if (this.classList.contains('category-section')) {
+                    const newCategory = this.dataset.category;
+                    if (newCategory !== draggingElement.dataset.category) {
+                        updateData.newCategory = newCategory;
+                        draggingElement.dataset.category = newCategory;
+                    }
+                }
+
+                // Handle day change
+                if (this.classList.contains('day-section')) {
+                    const newDate = this.dataset.date;
+                    const isCurrentlyCompleted = draggingElement.classList.contains('completed');
+                    const targetIsToday = this.dataset.completed === 'false';
+                    
+                    // Only change completion status if:
+                    // 1. Task is incomplete and being moved to a past day (mark as complete)
+                    // 2. Task is incomplete and staying incomplete in today's list
+                    // Don't change completion status if:
+                    // 1. Task is complete and being moved to any day (stays complete)
+                    const newIsCompleted = isCurrentlyCompleted || (!targetIsToday);
+
+                    if (newDate !== draggingElement.dataset.date) {
+                        updateData.newDate = newDate;
+                        updateData.isCompleted = newIsCompleted;
+                        draggingElement.dataset.date = newDate;
+                        
+                        if (newIsCompleted) {
+                            draggingElement.classList.add('completed');
+                        } else {
+                            draggingElement.classList.remove('completed');
+                        }
+                        shouldRefresh = true;  // Always refresh on day change
+                    }
+                }
+
+                // If there are changes, send them to the server
+                if (Object.keys(updateData).length > 0) {
+                    updateData.todoId = todoId;
+                    fetch('/move', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(updateData)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (!data.success) {
+                            console.error('Error updating todo:', data.error);
+                            window.location.reload();
+                        } else {
+                            if (shouldRefresh) {
+                                // Refresh the page to show the correct organization
+                                window.location.reload();
+                            } else if (this.classList.contains('category-section')) {
+                                // Only move the element if it's a category change within the same day
+                                const sameDay = this.closest('.day-section').dataset.date === draggingElement.dataset.date;
+                                if (sameDay) {
+                                    this.appendChild(draggingElement);
+                                } else {
+                                    window.location.reload();
+                                }
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        window.location.reload();
+                    });
+                }
+            }
         });
 
         // Theme toggle functionality
@@ -513,87 +856,26 @@
             themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
         });
 
-        document.addEventListener('DOMContentLoaded', function() {
-            const todoList = document.getElementById('todoList');
-            let draggingElement = null;
+        function openEditModal(id, title, description, category, deadline) {
+            document.getElementById('editTaskId').value = id;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editDescription').value = description;
+            document.getElementById('editCategory').value = category;
+            document.getElementById('editDeadline').value = deadline;
+            document.getElementById('editModal').style.display = 'block';
+        }
 
-            // Tüm todo öğelerine drag & drop event listener'ları ekle
-            document.querySelectorAll('.todo-item').forEach(item => {
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragend', handleDragEnd);
-                item.addEventListener('dragover', handleDragOver);
-                item.addEventListener('drop', handleDrop);
-                item.addEventListener('dragenter', handleDragEnter);
-                item.addEventListener('dragleave', handleDragLeave);
-            });
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
 
-            function handleDragStart(e) {
-                draggingElement = this;
-                this.classList.add('dragging');
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
             }
-
-            function handleDragEnd(e) {
-                this.classList.remove('dragging');
-                document.querySelectorAll('.todo-item').forEach(item => {
-                    item.classList.remove('drag-over');
-                });
-            }
-
-            function handleDragOver(e) {
-                e.preventDefault();
-            }
-
-            function handleDragEnter(e) {
-                e.preventDefault();
-                if (this !== draggingElement) {
-                    this.classList.add('drag-over');
-                }
-            }
-
-            function handleDragLeave(e) {
-                this.classList.remove('drag-over');
-            }
-
-            function handleDrop(e) {
-                e.preventDefault();
-                if (this === draggingElement) return;
-
-                let allItems = [...todoList.querySelectorAll('.todo-item')];
-                const draggingIndex = allItems.indexOf(draggingElement);
-                const dropIndex = allItems.indexOf(this);
-
-                if (draggingIndex > dropIndex) {
-                    this.parentNode.insertBefore(draggingElement, this);
-                } else {
-                    this.parentNode.insertBefore(draggingElement, this.nextSibling);
-                }
-
-                // Yeni sıralamayı sunucuya gönder
-                const newOrder = [...todoList.querySelectorAll('.todo-item')].map(item => item.dataset.id);
-                updateOrder(newOrder);
-            }
-
-            function updateOrder(newOrder) {
-                fetch('/reorder', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        todos: newOrder
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        console.error('Error updating order:', data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
-            }
-        });
+        }
     </script>
 </body>
 </html> 
