@@ -23,6 +23,8 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Category selection when creating/editing tasks
 - Visual category grouping in the interface
 - Drag & drop between categories
+- Create new categories on the fly while adding/editing tasks
+- Smart category management (preserves existing categories)
 
 ### Time Management
 - Set deadlines for tasks
@@ -39,6 +41,8 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Visual feedback for all interactions
 - Modal dialog for editing tasks
 - Drag & drop interface
+- Improved handling of long task titles and descriptions
+- Consistent button placement and visibility
 
 ## Installation
 

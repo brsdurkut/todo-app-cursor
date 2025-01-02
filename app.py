@@ -566,6 +566,58 @@ def edit():
             
     return redirect(url_for('index'))
 
+def create_category(category_name):
+    try:
+        # First, get current database to retrieve existing categories
+        database = notion.databases.retrieve(database_id=DATABASE_ID)
+        current_options = database.get('properties', {}).get('Category', {}).get('select', {}).get('options', [])
+        
+        # Check if category already exists
+        for option in current_options:
+            if option.get('name') == category_name:
+                return {"id": option.get('id'), "name": option.get('name')}
+        
+        # Add new category to existing ones
+        updated_options = current_options + [{"name": category_name}]
+        
+        # Update database with all categories
+        database = notion.databases.update(
+            database_id=DATABASE_ID,
+            properties={
+                "Category": {
+                    "select": {
+                        "options": updated_options
+                    }
+                }
+            }
+        )
+        
+        # Get the newly created category's details
+        category_options = database.get('properties', {}).get('Category', {}).get('select', {}).get('options', [])
+        for option in category_options:
+            if option.get('name') == category_name:
+                return {"id": option.get('id'), "name": option.get('name')}
+        return None
+    except Exception as e:
+        print(f"Error creating category: {e}")
+        return None
+
+@app.route('/create-category', methods=['POST'])
+def add_category():
+    try:
+        data = request.get_json()
+        category_name = data.get('name')
+        if not category_name:
+            return jsonify({"success": False, "error": "Category name is required"}), 400
+            
+        result = create_category(category_name)
+        if result:
+            return jsonify({"success": True, "category": result})
+        return jsonify({"success": False, "error": "Failed to create category"}), 500
+    except Exception as e:
+        print(f"Error in add_category: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     if not NOTION_TOKEN or not DATABASE_ID:
         print("Error: Please set NOTION_TOKEN and NOTION_DATABASE_ID in .env file")

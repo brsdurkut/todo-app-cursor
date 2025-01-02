@@ -116,13 +116,14 @@
             padding: 1rem;
             border-bottom: 1px solid var(--border-color);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             transition: background-color 0.2s;
             cursor: move;
             user-select: none;
             position: relative;
             z-index: 1;
+            gap: 1rem;
         }
 
         .todo-item:last-child {
@@ -134,11 +135,22 @@
         }
 
         .todo-title {
+            font-size: 1rem;
             color: var(--text-primary);
+            margin-bottom: 0.25rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
         }
 
         .todo-description {
-            color: var(--text-secondary);
+            font-size: 0.9rem;
+            color: var(--system-gray);
+            margin-top: 0.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
         }
 
         .todo-date, .todo-meta {
@@ -172,23 +184,10 @@
             border-color: var(--system-blue);
         }
 
-        .todo-description {
-            font-size: 0.9rem;
-            color: var(--system-gray);
-            margin-top: 0.5rem;
-            white-space: pre-wrap;
-        }
-
         .todo-content {
-            flex-grow: 1;
-            margin-right: 1rem;
-        }
-
-        .todo-title {
-            font-size: 1rem;
-            color: #000000;
-            margin-bottom: 0.25rem;
-            word-wrap: break-word;
+            flex: 1;
+            min-width: 0; /* Prevent flex item from overflowing */
+            margin-right: 0;
         }
 
         .todo-meta {
@@ -330,6 +329,8 @@
         .action-buttons {
             display: flex;
             gap: 0.5rem;
+            flex-shrink: 0;
+            align-self: flex-start;
         }
 
         .btn {
@@ -344,6 +345,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .btn:hover {
@@ -568,6 +570,80 @@
         .btn-primary:hover, .btn-secondary:hover {
             opacity: 0.9;
         }
+
+        .category-select-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .category-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: var(--card-background);
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-family: inherit;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .category-select:focus {
+            outline: none;
+            border-color: var(--system-blue);
+        }
+
+        .new-category-input {
+            display: none;
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background-color: var(--card-background);
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            font-family: inherit;
+        }
+
+        .new-category-input.active {
+            display: block;
+        }
+
+        .new-category-actions {
+            display: none;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .new-category-actions.active {
+            display: flex;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--system-blue);
+            color: white;
+        }
+
+        .btn-secondary {
+            background-color: var(--system-gray);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
@@ -585,12 +661,20 @@
                     <input type="text" name="title" class="task-input" placeholder="Task title..." required>
                     <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
                     <div class="form-row">
-                        <select name="category" class="category-select">
-                            <option value="">Select category (optional)</option>
-                            {% for category in categories %}
-                            <option value="{{ category.name }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="category-select-container">
+                            <select name="category" class="category-select">
+                                <option value="">Select category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                                <option value="new">Create new category...</option>
+                            </select>
+                            <input type="text" class="new-category-input" placeholder="Enter new category name">
+                            <div class="new-category-actions">
+                                <button type="button" class="btn btn-primary" onclick="createNewCategory(this.closest('.category-select-container'))">Add Category</button>
+                                <button type="button" class="btn btn-secondary" onclick="cancelNewCategory(this.closest('.category-select-container'))">Cancel</button>
+                            </div>
+                        </div>
                         <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
                     </div>
                 </div>
@@ -687,12 +771,20 @@
                     <input type="text" name="title" id="editTitle" class="task-input" placeholder="Task title..." required>
                     <textarea name="description" id="editDescription" class="task-description" placeholder="Task description (optional)..."></textarea>
                     <div class="form-row">
-                        <select name="category" id="editCategory" class="category-select">
-                            <option value="">Select category (optional)</option>
-                            {% for category in categories %}
-                            <option value="{{ category.name }}">{{ category.name }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="category-select-container">
+                            <select name="category" class="category-select" id="editCategory">
+                                <option value="">Select category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                                <option value="new">Create new category...</option>
+                            </select>
+                            <input type="text" class="new-category-input" placeholder="Enter new category name">
+                            <div class="new-category-actions">
+                                <button type="button" class="btn btn-primary" onclick="createNewCategory(this.closest('.category-select-container'))">Add Category</button>
+                                <button type="button" class="btn btn-secondary" onclick="cancelNewCategory(this.closest('.category-select-container'))">Cancel</button>
+                            </div>
+                        </div>
                         <input type="datetime-local" name="deadline" id="editDeadline" class="deadline-input" placeholder="Deadline (optional)">
                     </div>
                 </div>
@@ -894,6 +986,91 @@
                 closeEditModal();
             }
         }
+
+        function initializeCategorySelects() {
+            const categorySelects = document.querySelectorAll('.category-select');
+            categorySelects.forEach(select => {
+                select.addEventListener('change', function() {
+                    const container = this.closest('.category-select-container');
+                    const newCategoryInput = container.querySelector('.new-category-input');
+                    const newCategoryActions = container.querySelector('.new-category-actions');
+                    
+                    if (this.value === 'new') {
+                        newCategoryInput.classList.add('active');
+                        newCategoryActions.classList.add('active');
+                        newCategoryInput.focus();
+                    } else {
+                        newCategoryInput.classList.remove('active');
+                        newCategoryActions.classList.remove('active');
+                    }
+                });
+            });
+        }
+
+        async function createNewCategory(container) {
+            const input = container.querySelector('.new-category-input');
+            const select = container.querySelector('.category-select');
+            const categoryName = input.value.trim();
+            
+            if (!categoryName) {
+                alert('Please enter a category name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/create-category', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name: categoryName })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Add new option to all category selects
+                    const categorySelects = document.querySelectorAll('.category-select');
+                    categorySelects.forEach(selectElement => {
+                        const option = document.createElement('option');
+                        option.value = data.category.name;
+                        option.textContent = data.category.name;
+                        // Insert before the "Create new category" option
+                        const newCategoryOption = selectElement.querySelector('option[value="new"]');
+                        selectElement.insertBefore(option, newCategoryOption);
+                    });
+                    
+                    // Select the new category
+                    select.value = data.category.name;
+                    
+                    // Hide the input and actions
+                    input.classList.remove('active');
+                    container.querySelector('.new-category-actions').classList.remove('active');
+                    input.value = '';
+                } else {
+                    alert('Failed to create category: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error creating category:', error);
+                alert('Failed to create category. Please try again.');
+            }
+        }
+
+        function cancelNewCategory(container) {
+            const input = container.querySelector('.new-category-input');
+            const select = container.querySelector('.category-select');
+            const actions = container.querySelector('.new-category-actions');
+            
+            input.classList.remove('active');
+            actions.classList.remove('active');
+            input.value = '';
+            select.value = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... existing DOMContentLoaded code ...
+            initializeCategorySelects();
+        });
     </script>
 </body>
 </html> 
