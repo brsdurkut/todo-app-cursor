@@ -644,117 +644,279 @@
         .btn:hover {
             opacity: 0.9;
         }
+
+        /* Sidebar styles */
+        .layout-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background-color: var(--card-background);
+            border-right: 1px solid var(--border-color);
+            padding: 2rem 1rem;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-section h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sidebar-section h2 i {
+            color: var(--system-blue);
+        }
+
+        .recurring-task {
+            padding: 0.75rem;
+            background-color: var(--hover-background);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .recurring-task:hover {
+            transform: translateX(4px);
+        }
+
+        .recurring-task-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .recurring-task-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .recurring-task-pattern {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .add-recurring {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--hover-background);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            color: var(--system-blue);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .add-recurring:hover {
+            background-color: var(--card-background);
+            border-color: var(--system-blue);
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                display: none;
+            }
+        }
+
+        .sidebar-nav {
+            margin-bottom: 2rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background-color: var(--hover-background);
+        }
+
+        .nav-link.active {
+            background-color: var(--hover-background);
+            color: var(--system-blue);
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Tasks</h1>
-            <button class="theme-toggle" onclick="toggleTheme()">
-                <i class="fas fa-moon"></i>
-            </button>
-        </div>
-        
-        <form action="{{ url_for('add') }}" method="POST">
-            <div class="input-group">
-                <div class="task-input-group">
-                    <input type="text" name="title" class="task-input" placeholder="Task title..." required>
-                    <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
-                    <div class="form-row">
-                        <div class="category-select-container">
-                            <select name="category" class="category-select">
-                                <option value="">Select category</option>
-                                {% for category in categories %}
-                                <option value="{{ category.name }}">{{ category.name }}</option>
-                                {% endfor %}
-                                <option value="new">Create new category...</option>
-                            </select>
-                            <input type="text" class="new-category-input" placeholder="Enter new category name">
-                            <div class="new-category-actions">
-                                <button type="button" class="btn btn-primary" onclick="createNewCategory(this.closest('.category-select-container'))">Add Category</button>
-                                <button type="button" class="btn btn-secondary" onclick="cancelNewCategory(this.closest('.category-select-container'))">Cancel</button>
-                            </div>
-                        </div>
-                        <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
-                    </div>
-                </div>
-                <button type="submit" class="add-button">
-                    <i class="fas fa-plus"></i> Add
-                </button>
+    <div class="layout-container">
+        <aside class="sidebar">
+            <div class="sidebar-nav">
+                <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                    <i class="fas fa-tasks"></i>
+                    Tasks
+                </a>
+                <a href="{{ url_for('recurring_tasks_page') }}" class="nav-link {% if request.endpoint == 'recurring_tasks_page' %}active{% endif %}">
+                    <i class="fas fa-sync"></i>
+                    Recurring Tasks
+                </a>
             </div>
-        </form>
-
-        <div class="todo-list" id="todoList">
-            {% if grouped_todos %}
-                {% for day_str, day_data in grouped_todos %}
-                <div class="day-section" data-date="{{ day_str }}" data-completed="{{ 'true' if day_str != now.strftime('%Y-%m-%d') else 'false' }}">
-                    <div class="day-header">
-                        <h2>{{ day_data.date.strftime('%A, %d %B %Y') }}</h2>
-                    </div>
-                    {% for category, todos in day_data.categories.items() %}
-                    <div class="category-section" data-category="{{ category }}">
-                        <div class="category-header">
-                            <h3><i class="fas fa-tag"></i> {{ category }}</h3>
-                        </div>
-                        {% for todo in todos %}
-                        <div class="todo-item {% if todo.completed %}completed{% endif %}" 
-                             draggable="true"
-                             data-id="{{ todo.id }}"
-                             data-category="{{ todo.category }}"
-                             data-date="{{ day_str }}">
-                            <div class="todo-content">
-                                <div class="todo-title">{{ todo.title }}</div>
-                                {% if todo.description %}
-                                <div class="todo-description">{{ todo.description }}</div>
-                                {% endif %}
-                                <div class="todo-meta">
-                                    <div class="todo-time">
-                                        {% if todo.completed %}
-                                            <i class="fas fa-check-circle"></i>
-                                            {{ todo.completed_at.strftime('%H:%M') }}
-                                        {% else %}
-                                            <i class="fas fa-plus-circle"></i>
-                                            {{ todo.created_at.strftime('%H:%M') }}
-                                        {% endif %}
-                                    </div>
-                                    {% if todo.deadline %}
-                                    <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
-                                        <i class="fas fa-clock"></i>
-                                        <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="action-buttons">
-                                <button 
-                                    class="btn btn-edit"
-                                    data-id="{{ todo.id }}"
-                                    data-title="{{ todo.title | replace('"', '&quot;') }}"
-                                    data-description="{{ todo.description | replace('"', '&quot;') }}"
-                                    data-category="{{ todo.category }}"
-                                    data-deadline="{{ todo.deadline.isoformat() if todo.deadline else '' }}"
-                                    onclick="openEditModal(this)"
-                                >
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <a href="{{ url_for('complete', id=todo.id) }}" class="btn {% if todo.completed %}btn-undo{% else %}btn-complete{% endif %}">
-                                    <i class="fas {% if todo.completed %}fa-undo{% else %}fa-check{% endif %}"></i>
-                                </a>
-                                <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </div>
-                        </div>
-                        {% endfor %}
+            <div class="sidebar-section">
+                <h2><i class="fas fa-tag"></i> Categories</h2>
+                <div class="categories-list">
+                    {% for category in categories %}
+                    <div class="category-item">
+                        <i class="fas fa-tag"></i>
+                        {{ category.name }}
                     </div>
                     {% endfor %}
                 </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    No tasks added yet
+            </div>
+        </aside>
+        <div class="main-content">
+            <div class="container">
+                {% block content %}
+                <div class="header">
+                    <h1>Tasks</h1>
+                    <button class="theme-toggle" onclick="toggleTheme()">
+                        <i class="fas fa-moon"></i>
+                    </button>
                 </div>
-            {% endif %}
+                
+                <form action="{{ url_for('add') }}" method="POST">
+                    <div class="input-group">
+                        <div class="task-input-group">
+                            <input type="text" name="title" class="task-input" placeholder="Task title..." required>
+                            <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
+                            <div class="form-row">
+                                <div class="category-select-container">
+                                    <select name="category" class="category-select">
+                                        <option value="">Select category</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.name }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                        <option value="new">Create new category...</option>
+                                    </select>
+                                    <input type="text" class="new-category-input" placeholder="Enter new category name">
+                                    <div class="new-category-actions">
+                                        <button type="button" class="btn btn-primary" onclick="createNewCategory(this.closest('.category-select-container'))">Add Category</button>
+                                        <button type="button" class="btn btn-secondary" onclick="cancelNewCategory(this.closest('.category-select-container'))">Cancel</button>
+                                    </div>
+                                </div>
+                                <input type="datetime-local" name="deadline" class="deadline-input" placeholder="Deadline (optional)">
+                            </div>
+                        </div>
+                        <button type="submit" class="add-button">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                </form>
+
+                <div class="todo-list" id="todoList">
+                    {% if grouped_todos %}
+                        {% for day_str, day_data in grouped_todos %}
+                        <div class="day-section" data-date="{{ day_str }}" data-completed="{{ 'true' if day_str != now.strftime('%Y-%m-%d') else 'false' }}">
+                            <div class="day-header">
+                                <h2>{{ day_data.date.strftime('%A, %d %B %Y') }}</h2>
+                            </div>
+                            {% for category, todos in day_data.categories.items() %}
+                            <div class="category-section" data-category="{{ category }}">
+                                <div class="category-header">
+                                    <h3><i class="fas fa-tag"></i> {{ category }}</h3>
+                                </div>
+                                {% for todo in todos %}
+                                <div class="todo-item {% if todo.completed %}completed{% endif %}" 
+                                     draggable="true"
+                                     data-id="{{ todo.id }}"
+                                     data-category="{{ todo.category }}"
+                                     data-date="{{ day_str }}">
+                                    <div class="todo-content">
+                                        <div class="todo-title">{{ todo.title }}</div>
+                                        {% if todo.description %}
+                                        <div class="todo-description">{{ todo.description }}</div>
+                                        {% endif %}
+                                        <div class="todo-meta">
+                                            <div class="todo-time">
+                                                {% if todo.completed %}
+                                                    <i class="fas fa-check-circle"></i>
+                                                    {{ todo.completed_at.strftime('%H:%M') }}
+                                                {% else %}
+                                                    <i class="fas fa-plus-circle"></i>
+                                                    {{ todo.created_at.strftime('%H:%M') }}
+                                                {% endif %}
+                                            </div>
+                                            {% if todo.deadline %}
+                                            <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
+                                                <i class="fas fa-clock"></i>
+                                                <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="action-buttons">
+                                        <button 
+                                            class="btn btn-edit"
+                                            data-id="{{ todo.id }}"
+                                            data-title="{{ todo.title | replace('"', '&quot;') }}"
+                                            data-description="{{ todo.description | replace('"', '&quot;') }}"
+                                            data-category="{{ todo.category }}"
+                                            data-deadline="{{ todo.deadline.isoformat() if todo.deadline else '' }}"
+                                            onclick="openEditModal(this)"
+                                        >
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <a href="{{ url_for('complete', id=todo.id) }}" class="btn {% if todo.completed %}btn-undo{% else %}btn-complete{% endif %}">
+                                            <i class="fas {% if todo.completed %}fa-undo{% else %}fa-check{% endif %}"></i>
+                                        </a>
+                                        <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
+                                            <i class="fas fa-trash"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state">
+                            No tasks added yet
+                        </div>
+                    {% endif %}
+                </div>
+                {% endblock %}
+            </div>
         </div>
     </div>
 
@@ -791,6 +953,59 @@
                 <div class="modal-footer">
                     <button type="button" onclick="closeEditModal()" class="btn-secondary">Cancel</button>
                     <button type="submit" class="btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recurring Task Modal -->
+    <div id="recurringModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Recurring Task</h2>
+                <button onclick="closeRecurringModal()" class="close-button">&times;</button>
+            </div>
+            <form id="recurringForm" action="/add-recurring" method="POST">
+                <div class="task-input-group">
+                    <input type="text" name="title" class="task-input" placeholder="Task title..." required>
+                    <textarea name="description" class="task-description" placeholder="Task description (optional)..."></textarea>
+                    <div class="form-row">
+                        <div class="category-select-container">
+                            <select name="category" class="category-select">
+                                <option value="">Select category</option>
+                                {% for category in categories %}
+                                <option value="{{ category.name }}">{{ category.name }}</option>
+                                {% endfor %}
+                                <option value="new">Create new category...</option>
+                            </select>
+                            <input type="text" class="new-category-input" placeholder="Enter new category name">
+                            <div class="new-category-actions">
+                                <button type="button" class="btn btn-primary" onclick="createNewCategory(this.closest('.category-select-container'))">Add Category</button>
+                                <button type="button" class="btn btn-secondary" onclick="cancelNewCategory(this.closest('.category-select-container'))">Cancel</button>
+                            </div>
+                        </div>
+                        <select name="recurrence_pattern" class="category-select" required>
+                            <option value="">Select pattern</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div id="customRecurrence" style="display: none;">
+                        <div class="form-row">
+                            <input type="number" name="interval" class="task-input" placeholder="Interval (e.g., every 2 weeks)" min="1">
+                            <select name="interval_unit" class="category-select">
+                                <option value="days">Days</option>
+                                <option value="weeks">Weeks</option>
+                                <option value="months">Months</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" onclick="closeRecurringModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Recurring Task</button>
                 </div>
             </form>
         </div>
@@ -1070,6 +1285,132 @@
         document.addEventListener('DOMContentLoaded', function() {
             // ... existing DOMContentLoaded code ...
             initializeCategorySelects();
+        });
+
+        function openRecurringModal() {
+            document.getElementById('recurringModal').style.display = 'block';
+        }
+
+        function closeRecurringModal() {
+            document.getElementById('recurringModal').style.display = 'none';
+        }
+
+        // Recurring tasks functionality
+        function initializeRecurringTasks() {
+            // Initialize recurrence pattern select
+            const recurrenceSelect = document.querySelector('select[name="recurrence_pattern"]');
+            const customRecurrence = document.getElementById('customRecurrence');
+            
+            if (recurrenceSelect && customRecurrence) {
+                recurrenceSelect.addEventListener('change', function() {
+                    customRecurrence.style.display = this.value === 'custom' ? 'block' : 'none';
+                });
+            }
+
+            // Initialize recurring form submission
+            const recurringForm = document.getElementById('recurringForm');
+            if (recurringForm) {
+                recurringForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    fetch('/add-recurring', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            closeRecurringModal();
+                            loadRecurringTasks();
+                            this.reset();
+                        } else {
+                            alert('Error creating recurring task');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error creating recurring task');
+                    });
+                });
+            }
+
+            // Load recurring tasks if we're on the recurring tasks page
+            const recurringTasksList = document.querySelector('.recurring-tasks-list');
+            if (recurringTasksList) {
+                loadRecurringTasks();
+            }
+        }
+
+        function loadRecurringTasks() {
+            const tasksList = document.querySelector('.recurring-tasks-list');
+            if (!tasksList) return;
+
+            fetch('/recurring-tasks')
+                .then(response => response.json())
+                .then(tasks => {
+                    tasksList.innerHTML = ''; // Clear existing tasks
+                    
+                    if (tasks.length === 0) {
+                        tasksList.innerHTML = '<div class="empty-state">No recurring tasks</div>';
+                        return;
+                    }
+                    
+                    tasks.forEach(task => {
+                        const taskElement = document.createElement('div');
+                        taskElement.className = 'recurring-task-card';
+                        taskElement.innerHTML = `
+                            <div class="recurring-task-header">
+                                <h3>${task.title}</h3>
+                                <div class="recurring-task-actions">
+                                    <button class="btn btn-delete" onclick="deleteRecurringTask('${task.id}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="recurring-task-meta">
+                                <div class="recurring-task-pattern">
+                                    <i class="fas fa-redo"></i>
+                                    ${task.pattern}${task.interval > 1 ? ` (${task.interval})` : ''}
+                                </div>
+                                ${task.category ? `
+                                <div class="recurring-task-category">
+                                    <i class="fas fa-tag"></i>
+                                    ${task.category}
+                                </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        
+                        tasksList.appendChild(taskElement);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading recurring tasks:', error);
+                });
+        }
+
+        function deleteRecurringTask(id) {
+            if (confirm('Are you sure you want to delete this recurring task?')) {
+                fetch(`/delete-recurring/${id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            loadRecurringTasks();
+                        } else {
+                            alert('Error deleting recurring task');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Error deleting recurring task');
+                    });
+            }
+        }
+
+        // Initialize everything when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... existing initialization code ...
+            initializeRecurringTasks();
         });
     </script>
 </body>

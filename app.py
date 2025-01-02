@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from notion_client import Client
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 import pytz
 from flask_cors import CORS
+from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
@@ -495,6 +496,45 @@ def index():
     
     return render_template('index.html', grouped_todos=sorted_days, categories=categories, now=now)
 
+@app.route('/recurring')
+def recurring_tasks_page():
+    tasks = get_recurring_tasks()
+    formatted_tasks = []
+    
+    for task in tasks:
+        try:
+            properties = task.get('properties', {})
+            
+            # Get title
+            title = properties.get('Title', {})
+            title_content = ''
+            if title and title.get('title') and len(title['title']) > 0:
+                title_content = title['title'][0].get('text', {}).get('content', 'Untitled')
+            
+            # Get pattern and interval
+            pattern_obj = properties.get('RecurrencePattern', {}).get('select', {})
+            pattern = pattern_obj.get('name', 'daily') if pattern_obj else 'daily'
+            
+            interval = properties.get('RecurrenceInterval', {}).get('number', 1)
+            
+            # Get category
+            category_obj = properties.get('Category', {}).get('select', {})
+            category = category_obj.get('name', '') if category_obj else ''
+            
+            formatted_tasks.append({
+                'id': task.get('id', ''),
+                'title': title_content,
+                'pattern': pattern,
+                'interval': interval,
+                'category': category
+            })
+        except Exception as e:
+            print(f"Error formatting recurring task: {str(e)}")
+            continue
+    
+    categories = get_categories()
+    return render_template('recurring.html', tasks=formatted_tasks, categories=categories)
+
 @app.route('/add', methods=['POST'])
 def add():
     title = request.form.get('title')
@@ -616,6 +656,281 @@ def add_category():
         return jsonify({"success": False, "error": "Failed to create category"}), 500
     except Exception as e:
         print(f"Error in add_category: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+def get_recurring_tasks():
+    try:
+        response = notion.databases.query(
+            database_id=DATABASE_ID,
+            filter={
+                "and": [
+                    {
+                        "property": "IsRecurringTemplate",
+                        "checkbox": {
+                            "equals": True
+                        }
+                    },
+                    {
+                        "property": "Title",
+                        "title": {
+                            "is_not_empty": True
+                        }
+                    }
+                ]
+            }
+        )
+        return response.get('results', [])
+    except Exception as e:
+        print(f"Error fetching recurring tasks: {e}")
+        return []
+
+def create_recurring_task(title, description="", category_name=None, recurrence_pattern="daily", interval=1, interval_unit="days"):
+    try:
+        properties = {
+            "Title": {
+                "title": [
+                    {
+                        "text": {
+                            "content": title
+                        }
+                    }
+                ]
+            },
+            "Description": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": description
+                        }
+                    }
+                ]
+            },
+            "IsRecurringTemplate": {
+                "checkbox": True
+            },
+            "RecurrencePattern": {
+                "select": {
+                    "name": recurrence_pattern
+                }
+            },
+            "RecurrenceInterval": {
+                "number": interval
+            },
+            "LastGenerated": {
+                "date": {
+                    "start": get_utc_now().isoformat()
+                }
+            }
+        }
+
+        if category_name:
+            properties["Category"] = {
+                "select": {
+                    "name": category_name
+                }
+            }
+
+        # Create the recurring task template
+        response = notion.pages.create(
+            parent={"database_id": DATABASE_ID},
+            properties=properties
+        )
+
+        # Generate the first instance
+        generate_task_instance(response['id'])
+        
+        return True
+    except Exception as e:
+        print(f"Error creating recurring task: {e}")
+        return False
+
+def generate_task_instance(template_id):
+    try:
+        # Get the template task
+        template = notion.pages.retrieve(page_id=template_id)
+        
+        # Get properties from template
+        title = template['properties']['Title']['title'][0]['text']['content']
+        description = template['properties']['Description']['rich_text'][0]['text']['content'] if template['properties']['Description']['rich_text'] else ""
+        category = template['properties'].get('Category', {}).get('select', {}).get('name')
+        
+        # Create the task instance
+        properties = {
+            "Title": {
+                "title": [
+                    {
+                        "text": {
+                            "content": title
+                        }
+                    }
+                ]
+            },
+            "Description": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": description
+                        }
+                    }
+                ]
+            },
+            "Status": {
+                "checkbox": False
+            },
+            "RecurringParentId": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": template_id
+                        }
+                    }
+                ]
+            }
+        }
+
+        if category:
+            properties["Category"] = {
+                "select": {
+                    "name": category
+                }
+            }
+
+        # Create the task instance
+        notion.pages.create(
+            parent={"database_id": DATABASE_ID},
+            properties=properties
+        )
+
+        # Update LastGenerated date on template
+        notion.pages.update(
+            page_id=template_id,
+            properties={
+                "LastGenerated": {
+                    "date": {
+                        "start": get_utc_now().isoformat()
+                    }
+                }
+            }
+        )
+
+        return True
+    except Exception as e:
+        print(f"Error generating task instance: {e}")
+        return False
+
+def check_recurring_tasks():
+    try:
+        recurring_tasks = get_recurring_tasks()
+        now = get_utc_now()
+        
+        for task in recurring_tasks:
+            last_generated = task['properties'].get('LastGenerated', {}).get('date', {}).get('start')
+            if not last_generated:
+                continue
+                
+            last_generated = datetime.fromisoformat(last_generated.replace('Z', '+00:00'))
+            pattern = task['properties'].get('RecurrencePattern', {}).get('select', {}).get('name', 'daily')
+            interval = task['properties'].get('RecurrenceInterval', {}).get('number', 1)
+            
+            # Calculate next generation date
+            if pattern == 'daily':
+                next_date = last_generated + timedelta(days=interval)
+            elif pattern == 'weekly':
+                next_date = last_generated + timedelta(weeks=interval)
+            elif pattern == 'monthly':
+                # Add months by adding days (approximate)
+                next_date = last_generated + timedelta(days=30 * interval)
+            else:  # custom
+                # Default to daily if pattern is invalid
+                next_date = last_generated + timedelta(days=interval)
+            
+            # If it's time to generate a new instance
+            if now >= next_date:
+                generate_task_instance(task['id'])
+    except Exception as e:
+        print(f"Error checking recurring tasks: {e}")
+
+# Initialize the scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=check_recurring_tasks, trigger="interval", minutes=30)
+scheduler.start()
+
+@app.route('/recurring-tasks')
+def get_recurring_tasks_route():
+    tasks = get_recurring_tasks()
+    formatted_tasks = []
+    
+    for task in tasks:
+        try:
+            properties = task.get('properties', {})
+            
+            # Get title
+            title = properties.get('Title', {})
+            title_content = ''
+            if title and title.get('title') and len(title['title']) > 0:
+                title_content = title['title'][0].get('text', {}).get('content', 'Untitled')
+            
+            # Get pattern and interval
+            pattern_obj = properties.get('RecurrencePattern', {}).get('select', {})
+            pattern = pattern_obj.get('name', 'daily') if pattern_obj else 'daily'
+            
+            interval = properties.get('RecurrenceInterval', {}).get('number', 1)
+            
+            # Get category
+            category_obj = properties.get('Category', {}).get('select', {})
+            category = category_obj.get('name', '') if category_obj else ''
+            
+            formatted_tasks.append({
+                'id': task.get('id', ''),
+                'title': title_content,
+                'pattern': pattern,
+                'interval': interval,
+                'category': category
+            })
+        except Exception as e:
+            print(f"Error formatting recurring task: {str(e)}")
+            continue
+    
+    return jsonify(formatted_tasks)
+
+@app.route('/add-recurring', methods=['POST'])
+def add_recurring():
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    category = request.form.get('category', '')
+    pattern = request.form.get('recurrence_pattern', 'daily')
+    
+    interval = 1
+    if pattern == 'custom':
+        try:
+            interval = int(request.form.get('interval', 1))
+            interval_unit = request.form.get('interval_unit', 'days')
+            pattern = f"every_{interval}_{interval_unit}"
+        except ValueError:
+            interval = 1
+    
+    if title:
+        create_recurring_task(
+            title=title,
+            description=description,
+            category_name=category if category else None,
+            recurrence_pattern=pattern,
+            interval=interval
+        )
+    
+    return redirect(url_for('index'))
+
+@app.route('/delete-recurring/<string:id>')
+def delete_recurring(id):
+    try:
+        # Archive the template
+        notion.pages.update(
+            page_id=id,
+            archived=True
+        )
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error deleting recurring task: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':

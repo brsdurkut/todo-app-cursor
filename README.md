@@ -1,6 +1,6 @@
 # Todo Application
 
-A Flask-based todo application integrated with Notion API, featuring a modern UI with drag & drop functionality and dark/light theme support.
+A Flask-based todo application integrated with Notion API, featuring a modern UI with drag & drop functionality, recurring tasks, and dark/light theme support.
 
 ## Features
 
@@ -9,6 +9,17 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Rich task details including title, description, category, and deadline
 - Mark tasks as complete/incomplete with visual feedback
 - Automatic task organization by completion status
+
+### Recurring Tasks
+- Create recurring tasks with different patterns:
+  - Daily
+  - Weekly
+  - Monthly
+  - Custom intervals (e.g., every 2 weeks)
+- Automatic task generation based on recurrence pattern
+- Separate page for managing recurring tasks
+- Background scheduler for task generation
+- Category support for recurring tasks
 
 ### Organization
 - Tasks automatically grouped by day and category
@@ -25,6 +36,7 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Drag & drop between categories
 - Create new categories on the fly while adding/editing tasks
 - Smart category management (preserves existing categories)
+- Category list in sidebar for quick reference
 
 ### Time Management
 - Set deadlines for tasks
@@ -35,11 +47,12 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
   - Completion time for completed tasks
 
 ### User Interface
-- Clean, modern design
+- Clean, modern design with sidebar navigation
+- Separate pages for tasks and recurring tasks
 - Dark/light theme support
 - Responsive layout
 - Visual feedback for all interactions
-- Modal dialog for editing tasks
+- Modal dialogs for editing tasks and creating recurring tasks
 - Drag & drop interface
 - Improved handling of long task titles and descriptions
 - Consistent button placement and visibility
@@ -85,6 +98,11 @@ FLASK_SECRET_KEY=your_secret_key_here  # Optional, defaults to a secure value if
       - Order (number)
       - Deadline (date)
       - CompletedAt (date)
+      - IsRecurringTemplate (checkbox)
+      - RecurrencePattern (select)
+      - RecurrenceInterval (number)
+      - LastGenerated (date)
+      - RecurringParentId (rich_text)
    4. Copy the database ID from the URL:
       - URL format: `https://www.notion.so/{workspace}/{database_id}?v=...`
       - Copy the database_id part to your `.env` file
@@ -130,6 +148,7 @@ python app.py
 - Flask 3.0.0
 - Flask-CORS 4.0.0
 - Notion API (notion-client 2.2.1)
+- APScheduler 3.10.4
 - HTML/CSS
 - JavaScript
 - Font Awesome icons
@@ -143,6 +162,7 @@ python app.py
 - Categorize tasks by project or priority
 - Monitor task completion status
 - Organize tasks by completion date
+- Create recurring tasks for regular activities
 
 ### Project Management
 - Create and organize project milestones
@@ -150,6 +170,7 @@ python app.py
 - Track project progress through task completion
 - Maintain project documentation in Notion
 - Group related tasks by category
+- Set up recurring project meetings and reviews
 
 ### Academic Planning
 - Manage course assignments and deadlines
@@ -157,6 +178,7 @@ python app.py
 - Track research tasks and progress
 - Coordinate group project tasks
 - Categorize tasks by subject or priority
+- Create recurring study sessions
 
 ### Event Planning
 - Create checklists for event preparations
@@ -164,6 +186,7 @@ python app.py
 - Categorize tasks by event components
 - Track completed and pending tasks
 - Share event planning progress with stakeholders
+- Set up recurring event maintenance tasks
 
 ## Security
 
@@ -172,6 +195,7 @@ The application includes several security features:
 - Secret key for session management
 - Secure data handling
 - XSS protection in templates
+- Background job security
 
 ## License
 

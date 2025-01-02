@@ -1,0 +1,95 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>Recurring Tasks</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <i class="fas fa-moon"></i>
+    </button>
+</div>
+
+<div class="recurring-tasks-container">
+    <button class="add-button" onclick="openRecurringModal()">
+        <i class="fas fa-plus"></i> Add Recurring Task
+    </button>
+
+    <div class="recurring-tasks-list">
+        {% if tasks %}
+            {% for task in tasks %}
+            <div class="recurring-task-card">
+                <div class="recurring-task-header">
+                    <h3>{{ task.title }}</h3>
+                    <div class="recurring-task-actions">
+                        <button class="btn btn-delete" onclick="deleteRecurringTask('{{ task.id }}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="recurring-task-meta">
+                    <div class="recurring-task-pattern">
+                        <i class="fas fa-redo"></i>
+                        {{ task.pattern }}{% if task.interval > 1 %} ({{ task.interval }}){% endif %}
+                    </div>
+                    {% if task.category %}
+                    <div class="recurring-task-category">
+                        <i class="fas fa-tag"></i>
+                        {{ task.category }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                No recurring tasks added yet
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .recurring-tasks-container {
+        margin-top: 2rem;
+    }
+
+    .recurring-task-card {
+        background: var(--card-background);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .recurring-task-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .recurring-task-header h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .recurring-task-meta {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+    }
+
+    .recurring-task-pattern,
+    .recurring-task-category {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .add-button {
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %} 
