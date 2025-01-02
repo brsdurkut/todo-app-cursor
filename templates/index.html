@@ -412,36 +412,56 @@
         }
 
         .category-section {
+            margin-bottom: 1rem;
             background: var(--card-background);
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
         }
 
         .category-header {
-            padding: 0.75rem 1rem;
-            background-color: var(--hover-background);
+            padding: 1rem;
+            background: var(--card-background);
             border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .category-header:hover {
+            background-color: var(--hover-background);
         }
 
         .category-header h3 {
-            font-size: 1rem;
-            font-weight: 500;
+            margin: 0;
+            font-size: 1.1rem;
             color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .category-header i {
-            color: var(--system-blue);
-            font-size: 0.9rem;
+        .category-content {
+            display: none;
         }
 
-        .todo-time {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
+        .category-content.open {
+            display: block;
+        }
+
+        .category-toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .category-header.open .category-toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .todo-list {
+            border-radius: 0;
+            box-shadow: none;
         }
 
         .form-row {
@@ -777,6 +797,68 @@
             width: 20px;
             text-align: center;
         }
+
+        .category-header h3 i {
+            color: var(--system-blue);
+            margin-right: 0.5rem;
+        }
+
+        .category-toggle-icon {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .todo-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+            text-decoration: none;
+        }
+
+        .action-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .action-btn.complete-btn:hover {
+            color: var(--system-green);
+        }
+
+        .action-btn.edit-btn:hover {
+            color: var(--system-blue);
+        }
+
+        .action-btn.delete-btn:hover {
+            color: var(--system-red);
+        }
+
+        .action-btn i {
+            font-size: 1.1rem;
+        }
+
+        .todo-item[data-id] {
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .todo-item[data-id].completed .todo-title,
+        .todo-item[data-id].completed .todo-description {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+
+        .todo-item[data-id].completed .todo-meta {
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -852,59 +934,48 @@
                             </div>
                             {% for category, todos in day_data.categories.items() %}
                             <div class="category-section" data-category="{{ category }}">
-                                <div class="category-header">
-                                    <h3><i class="fas fa-tag"></i> {{ category }}</h3>
+                                <div class="category-header" onclick="toggleCategory(this)">
+                                    <h3>
+                                        <i class="fas fa-folder"></i>
+                                        {{ category if category else 'Uncategorized' }}
+                                        <span class="todo-count">({{ todos|length }})</span>
+                                    </h3>
+                                    <i class="fas fa-chevron-down category-toggle-icon"></i>
                                 </div>
-                                {% for todo in todos %}
-                                <div class="todo-item {% if todo.completed %}completed{% endif %}" 
-                                     draggable="true"
-                                     data-id="{{ todo.id }}"
-                                     data-category="{{ todo.category }}"
-                                     data-date="{{ day_str }}">
-                                    <div class="todo-content">
-                                        <div class="todo-title">{{ todo.title }}</div>
-                                        {% if todo.description %}
-                                        <div class="todo-description">{{ todo.description }}</div>
-                                        {% endif %}
-                                        <div class="todo-meta">
-                                            <div class="todo-time">
-                                                {% if todo.completed %}
-                                                    <i class="fas fa-check-circle"></i>
-                                                    {{ todo.completed_at.strftime('%H:%M') }}
-                                                {% else %}
-                                                    <i class="fas fa-plus-circle"></i>
-                                                    {{ todo.created_at.strftime('%H:%M') }}
-                                                {% endif %}
+                                <div class="category-content">
+                                    <div class="todo-list">
+                                        {% for todo in todos %}
+                                            <div class="todo-item {% if todo.completed %}completed{% endif %}" data-id="{{ todo.id }}" draggable="true">
+                                                <!-- Existing todo item content -->
+                                                <div class="todo-content">
+                                                    <div class="todo-title">{{ todo.title }}</div>
+                                                    {% if todo.description %}
+                                                        <div class="todo-description">{{ todo.description }}</div>
+                                                    {% endif %}
+                                                    <div class="todo-meta">
+                                                        {% if todo.deadline %}
+                                                            <span class="todo-date">
+                                                                <i class="far fa-calendar"></i>
+                                                                {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
+                                                            </span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                <div class="todo-actions">
+                                                    <a href="{{ url_for('complete', id=todo.id) }}" class="action-btn complete-btn">
+                                                        <i class="far {% if todo.completed %}fa-check-square{% else %}fa-square{% endif %}"></i>
+                                                    </a>
+                                                    <button class="action-btn edit-btn" onclick="editTodo('{{ todo.id }}', '{{ todo.title|replace('\'', '\\\'') }}', '{{ todo.description|replace('\'', '\\\'') }}', '{{ todo.deadline.isoformat() if todo.deadline else '' }}', '{{ todo.category }}')">
+                                                        <i class="far fa-edit"></i>
+                                                    </button>
+                                                    <a href="{{ url_for('delete', id=todo.id) }}" class="action-btn delete-btn" onclick="return confirm('Are you sure you want to delete this task?')">
+                                                        <i class="far fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
                                             </div>
-                                            {% if todo.deadline %}
-                                            <div class="todo-deadline {% if todo.deadline < now %}urgent{% elif (todo.deadline - now).days < 3 %}upcoming{% endif %}">
-                                                <i class="fas fa-clock"></i>
-                                                <span>{{ todo.deadline.strftime('%d %B %Y, %H:%M') }}</span>
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="action-buttons">
-                                        <button 
-                                            class="btn btn-edit"
-                                            data-id="{{ todo.id }}"
-                                            data-title="{{ todo.title | replace('"', '&quot;') }}"
-                                            data-description="{{ todo.description | replace('"', '&quot;') }}"
-                                            data-category="{{ todo.category }}"
-                                            data-deadline="{{ todo.deadline.isoformat() if todo.deadline else '' }}"
-                                            onclick="openEditModal(this)"
-                                        >
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <a href="{{ url_for('complete', id=todo.id) }}" class="btn {% if todo.completed %}btn-undo{% else %}btn-complete{% endif %}">
-                                            <i class="fas {% if todo.completed %}fa-undo{% else %}fa-check{% endif %}"></i>
-                                        </a>
-                                        <a href="{{ url_for('delete', id=todo.id) }}" class="btn btn-delete">
-                                            <i class="fas fa-trash"></i>
-                                        </a>
+                                        {% endfor %}
                                     </div>
                                 </div>
-                                {% endfor %}
                             </div>
                             {% endfor %}
                         </div>
@@ -1080,6 +1151,55 @@
                         updateData.newCategory = newCategory;
                         draggingElement.dataset.category = newCategory;
                     }
+
+                    // Get all todos in the new category section for reordering
+                    const todos = Array.from(this.children)
+                        .filter(child => child.classList.contains('todo-item'))
+                        .map(todo => todo.dataset.id);
+                    
+                    // Add the dragged todo to the list if it's not already there
+                    if (!todos.includes(todoId)) {
+                        todos.push(todoId);
+                    }
+
+                    // Get the target position
+                    const targetRect = this.getBoundingClientRect();
+                    const mouseY = e.clientY;
+                    const children = Array.from(this.children).filter(child => child.classList.contains('todo-item'));
+                    
+                    let insertBefore = null;
+                    for (const child of children) {
+                        const childRect = child.getBoundingClientRect();
+                        const childMiddle = childRect.top + childRect.height / 2;
+                        if (mouseY < childMiddle) {
+                            insertBefore = child;
+                            break;
+                        }
+                    }
+
+                    // Insert the dragged element at the correct position
+                    if (insertBefore) {
+                        this.insertBefore(draggingElement, insertBefore);
+                    } else {
+                        this.appendChild(draggingElement);
+                    }
+
+                    // Update the order in the backend
+                    const updatedTodos = Array.from(this.children)
+                        .filter(child => child.classList.contains('todo-item'))
+                        .map(todo => todo.dataset.id);
+
+                    fetch('/reorder', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ todos: updatedTodos })
+                    })
+                    .then(response => response.json())
+                    .catch(error => {
+                        console.error('Error reordering:', error);
+                    });
                 }
 
                 // Handle day change
@@ -1411,6 +1531,32 @@
         document.addEventListener('DOMContentLoaded', function() {
             // ... existing initialization code ...
             initializeRecurringTasks();
+        });
+
+        function toggleCategory(header) {
+            const content = header.nextElementSibling;
+            header.classList.toggle('open');
+            content.classList.toggle('open');
+        }
+
+        function editTodo(id, title, description, deadline, category) {
+            // Set values in the edit form
+            document.getElementById('editTaskId').value = id;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editDescription').value = description;
+            document.getElementById('editCategory').value = category || '';
+            document.getElementById('editDeadline').value = deadline || '';
+            
+            // Show the modal
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        // Open the first category by default
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstCategory = document.querySelector('.category-header');
+            if (firstCategory) {
+                firstCategory.click();
+            }
         });
     </script>
 </body>

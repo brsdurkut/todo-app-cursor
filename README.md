@@ -9,6 +9,9 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Rich task details including title, description, category, and deadline
 - Mark tasks as complete/incomplete with visual feedback
 - Automatic task organization by completion status
+- Improved drag & drop functionality with smoother animations
+- Enhanced error handling for concurrent updates
+- Optimized task updates with retry mechanism
 
 ### Recurring Tasks
 - Create recurring tasks with different patterns:
@@ -20,6 +23,7 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Separate page for managing recurring tasks
 - Background scheduler for task generation
 - Category support for recurring tasks
+- Improved task generation reliability
 
 ### Organization
 - Tasks automatically grouped by day and category
@@ -28,6 +32,8 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
   - Moving tasks between days (automatically handles completion status)
 - Completed tasks shown in their completion day
 - Incomplete tasks always shown in today's list
+- Enhanced category collapsing/expanding
+- Improved task ordering within categories
 
 ### Categories
 - Organize tasks with customizable categories
@@ -37,6 +43,7 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Create new categories on the fly while adding/editing tasks
 - Smart category management (preserves existing categories)
 - Category list in sidebar for quick reference
+- Enhanced category validation
 
 ### Time Management
 - Set deadlines for tasks
@@ -45,17 +52,29 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
   - Upcoming deadlines (within 3 days)
   - Creation time for incomplete tasks
   - Completion time for completed tasks
+- Improved date handling and timezone support
+- Better deadline validation
 
 ### User Interface
 - Clean, modern design with sidebar navigation
 - Separate pages for tasks and recurring tasks
-- Dark/light theme support
+- Dark/light theme support with persistent preference
 - Responsive layout
 - Visual feedback for all interactions
 - Modal dialogs for editing tasks and creating recurring tasks
-- Drag & drop interface
+- Drag & drop interface with improved animations
 - Improved handling of long task titles and descriptions
 - Consistent button placement and visibility
+- Enhanced error messages and user feedback
+
+### Performance & Reliability
+- Optimized API calls with retry mechanism
+- Improved error handling for concurrent updates
+- Better state management
+- Enhanced data validation
+- Smoother animations and transitions
+- Reduced API calls through smart caching
+- Improved task synchronization
 
 ## Installation
 
@@ -142,6 +161,16 @@ python app.py
    - Check browser console for error messages
    - Ensure all required fields are properly formatted
 
+4. Date/Time Issues:
+   - Check your system timezone settings
+   - Verify date formats in the database
+   - Ensure proper UTC conversion
+
+5. Concurrent Update Errors:
+   - The app now includes retry mechanism
+   - Wait a moment and try again
+   - Check for any conflicting updates
+
 ## Technologies Used
 
 - Python 3.7+
@@ -196,6 +225,8 @@ The application includes several security features:
 - Secure data handling
 - XSS protection in templates
 - Background job security
+- Enhanced error handling
+- Improved data validation
 
 ## License
 

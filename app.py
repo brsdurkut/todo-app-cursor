@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import pytz
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
+import time
 
 load_dotenv()
 
@@ -26,27 +27,42 @@ def get_utc_now():
 
 def get_todos():
     try:
-        response = notion.databases.query(
-            database_id=DATABASE_ID,
-            sorts=[
-                {
-                    "property": "Status",
-                    "direction": "ascending"  # Show uncompleted tasks first
+        all_results = []
+        has_more = True
+        next_cursor = None
+        
+        while has_more:
+            query_params = {
+                "database_id": DATABASE_ID,
+                "sorts": [
+                    {
+                        "property": "Status",
+                        "direction": "ascending"
+                    },
+                    {
+                        "property": "Order",
+                        "direction": "ascending"
+                    }
+                ],
+                "filter": {
+                    "property": "Title",
+                    "title": {
+                        "is_not_empty": True
+                    }
                 },
-                {
-                    "property": "Order",
-                    "direction": "ascending"  # Then sort by order
-                }
-            ],
-            filter={
-                "property": "Title",
-                "title": {
-                    "is_not_empty": True
-                }
+                "page_size": 100
             }
-        )
-        print("Notion API Response:", response)
-        return response.get('results', [])
+            
+            if next_cursor:
+                query_params["start_cursor"] = next_cursor
+            
+            response = notion.databases.query(**query_params)
+            results = response.get('results', [])
+            all_results.extend(results)
+            has_more = response.get('has_more', False)
+            next_cursor = response.get('next_cursor')
+        
+        return all_results
     except Exception as e:
         print(f"Error fetching todos: {e}")
         return []
@@ -171,7 +187,9 @@ def update_todo_completion(page_id, is_completed, completion_date=None):
                 }
             }
         elif not is_completed:
-            properties["CompletedAt"] = None
+            properties["CompletedAt"] = {
+                "date": None
+            }
             
         notion.pages.update(
             page_id=page_id,
@@ -409,7 +427,10 @@ def index():
     todos = get_todos()
     categories = get_categories()
     now = get_utc_now()
-    today = now.date()
+    
+    # Get user's local timezone
+    local_tz = pytz.timezone('Europe/Istanbul')  # Türkiye için
+    today = now.astimezone(local_tz).date()
     
     # Dictionary to store todos grouped by day and category
     grouped_todos = {}
@@ -426,7 +447,7 @@ def index():
             deadline = todo['properties'].get('Deadline', {}).get('date', {})
             deadline_date = None
             if deadline and deadline.get('start'):
-                deadline_date = datetime.fromisoformat(deadline['start'].replace('Z', '+00:00')).astimezone(pytz.UTC)
+                deadline_date = datetime.fromisoformat(deadline['start'].replace('Z', '+00:00')).astimezone(local_tz)
             
             # Get category from select field
             category = todo['properties'].get('Category', {}).get('select', {})
@@ -437,7 +458,14 @@ def index():
             completed_at = todo['properties'].get('CompletedAt', {}).get('date', {})
             completed_date = None
             if completed_at and completed_at.get('start'):
-                completed_date = datetime.fromisoformat(completed_at['start'].replace('Z', '+00:00')).astimezone(pytz.UTC)
+                # Parse the completion date and ensure it's in UTC
+                completed_str = completed_at['start']
+                # Fix malformed UTC offset by removing any duplicate +00:00
+                if completed_str.count('+00:00') > 1:
+                    completed_str = completed_str.replace('+00:00', '', completed_str.count('+00:00') - 1)
+                if not completed_str.endswith('Z') and not completed_str.endswith('+00:00'):
+                    completed_str += 'Z'
+                completed_date = datetime.fromisoformat(completed_str.replace('Z', '+00:00')).astimezone(local_tz)
             
             # Format the todo
             formatted_todo = {
@@ -446,7 +474,7 @@ def index():
                 'description': description_content,
                 'category': category_name,
                 'completed': is_completed,
-                'created_at': datetime.fromisoformat(todo['created_time'].replace('Z', '+00:00')).astimezone(pytz.UTC),
+                'created_at': datetime.fromisoformat(todo['created_time'].replace('Z', '+00:00')).astimezone(local_tz),
                 'completed_at': completed_date,
                 'deadline': deadline_date,
                 'order': todo['properties'].get('Order', {}).get('number', 0)
@@ -455,6 +483,8 @@ def index():
             # Determine which day to show the todo
             if is_completed and completed_date:
                 display_date = completed_date.date()
+            elif deadline_date and deadline_date.date() >= today:
+                display_date = deadline_date.date()
             else:
                 display_date = today
             
@@ -483,8 +513,11 @@ def index():
     
     # For each day, sort categories alphabetically and sort todos within categories
     for day_str, day_data in grouped_todos.items():
-        # Sort categories alphabetically
-        day_data['categories'] = dict(sorted(day_data['categories'].items()))
+        # Sort categories with Uncategorized always first, then alphabetically
+        day_data['categories'] = dict(sorted(
+            day_data['categories'].items(),
+            key=lambda x: ('1' if x[0] == '' or x[0] == 'Uncategorized' else '2' + x[0].lower())
+        ))
         
         # Sort todos within each category
         for category in day_data['categories'].values():
@@ -545,7 +578,9 @@ def add():
     if title:
         if deadline:
             # Convert local time to UTC
+            local_tz = pytz.timezone('Europe/Istanbul')
             local_dt = datetime.fromisoformat(deadline)
+            local_dt = local_tz.localize(local_dt)
             utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
             create_todo(title, description, utc_dt, category if category else None)
         else:
@@ -562,6 +597,23 @@ def delete(id):
     delete_todo(id)
     return redirect(url_for('index'))
 
+def update_notion_with_retry(page_id, properties, max_retries=3, delay=0.5):
+    for attempt in range(max_retries):
+        try:
+            notion.pages.update(
+                page_id=page_id,
+                properties=properties
+            )
+            return True
+        except Exception as e:
+            if "Conflict" in str(e) and attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))  # Exponential backoff
+                continue
+            print(f"Error updating todo (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                raise
+    return False
+
 @app.route('/move', methods=['POST'])
 def move_todo():
     try:
@@ -571,40 +623,89 @@ def move_todo():
         new_date = data.get('newDate')
         is_completed = data.get('isCompleted', False)
         
-        success = True
+        # Prepare properties for a single update
+        properties = {}
         
-        # Update category if changed
+        # Add category update if needed
         if new_category is not None:
-            success = success and update_todo_category(todo_id, new_category)
+            properties["Category"] = {
+                "select": {
+                    "name": new_category
+                } if new_category != "Uncategorized" else None
+            }
         
-        # Update completion status and date if changed
+        # Add completion status and date if needed
         if new_date is not None:
-            completion_date = datetime.fromisoformat(new_date) if new_date else None
-            success = success and update_todo_completion(todo_id, is_completed, completion_date)
+            try:
+                completion_date = datetime.fromisoformat(new_date) if new_date else None
+                if completion_date:
+                    # Convert to UTC if it's not already
+                    if not completion_date.tzinfo:
+                        local_tz = pytz.timezone('Europe/Istanbul')
+                        completion_date = local_tz.localize(completion_date).astimezone(pytz.UTC)
+                
+                properties["Status"] = {
+                    "checkbox": is_completed
+                }
+                
+                if is_completed and completion_date:
+                    properties["CompletedAt"] = {
+                        "date": {
+                            "start": completion_date.isoformat()
+                        }
+                    }
+                else:
+                    properties["CompletedAt"] = {
+                        "date": None
+                    }
+            except ValueError as e:
+                print(f"Error parsing date: {e}")
+                return jsonify({"success": False, "error": "Invalid date format"}), 400
         
-        return jsonify({"success": success})
+        # Make a single API call to update everything with retry logic
+        if properties:
+            try:
+                success = update_notion_with_retry(todo_id, properties)
+                if success:
+                    time.sleep(0.1)  # Small delay to prevent rapid consecutive updates
+                    return jsonify({"success": True})
+                return jsonify({"success": False, "error": "Failed to update after retries"}), 500
+            except Exception as e:
+                print(f"Error updating todo: {e}")
+                return jsonify({"success": False, "error": str(e)}), 500
+        
+        return jsonify({"success": True})
     except Exception as e:
         print(f"Error in move_todo: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/edit', methods=['POST'])
 def edit():
-    todo_id = request.form.get('id')
-    title = request.form.get('title')
-    description = request.form.get('description', '')
-    deadline = request.form.get('deadline', '')
-    category = request.form.get('category', '')
-    
-    if todo_id and title:
-        if deadline:
-            # Convert local time to UTC
-            local_dt = datetime.fromisoformat(deadline)
-            utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
-            update_todo(todo_id, title, description, utc_dt, category)
-        else:
-            update_todo(todo_id, title, description, "", category)
-            
-    return redirect(url_for('index'))
+    try:
+        todo_id = request.form.get('id')
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        deadline = request.form.get('deadline', '')
+        category = request.form.get('category', '')
+        
+        if todo_id and title:
+            if deadline:
+                # Convert local time to UTC
+                local_tz = pytz.timezone('Europe/Istanbul')
+                local_dt = datetime.fromisoformat(deadline)
+                local_dt = local_tz.localize(local_dt)
+                utc_dt = local_dt.astimezone(pytz.UTC).isoformat()
+                success = update_todo(todo_id, title, description, utc_dt, category)
+            else:
+                success = update_todo(todo_id, title, description, "", category)
+                
+            if not success:
+                return jsonify({"success": False, "error": "Failed to update todo"}), 500
+                
+        return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error in edit: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 def create_category(category_name):
     try:
