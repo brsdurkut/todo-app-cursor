@@ -53,6 +53,32 @@ Your Notion database should have the following properties:
 - HTML/CSS
 - JavaScript
 
+## Use Cases
+
+### Personal Task Management
+- Keep track of daily tasks and routines
+- Set deadlines for important assignments
+- Categorize tasks by project or priority
+- Monitor task completion status
+
+### Project Management
+- Create and organize project milestones
+- Assign tasks with specific deadlines
+- Track project progress through task completion
+- Maintain project documentation in Notion
+
+### Academic Planning
+- Manage course assignments and deadlines
+- Organize study schedules
+- Track research tasks and progress
+- Coordinate group project tasks
+
+### Event Planning
+- Create checklists for event preparations
+- Set deadlines for various event tasks
+- Categorize tasks by event components
+- Share event planning progress with stakeholders
+
 ## License
 
 This project is licensed under the MIT License. 
