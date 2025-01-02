@@ -53,33 +53,76 @@ cd todo-app-cursor
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file and add your Notion API credentials:
-```
-NOTION_TOKEN=your_notion_token
+3. Create a `.env` file in the root directory and add your credentials:
+```env
+NOTION_TOKEN=your_notion_integration_token
 NOTION_DATABASE_ID=your_database_id
+FLASK_SECRET_KEY=your_secret_key_here
 ```
 
-4. Run the application:
+4. Set up Notion Integration:
+   1. Go to https://www.notion.so/my-integrations
+   2. Click "New integration"
+   3. Name your integration (e.g., "Todo App")
+   4. Select the workspace where your database will live
+   5. Copy the "Internal Integration Token" to your `.env` file
+
+5. Create Notion Database:
+   1. Create a new page in Notion
+   2. Add a new database (full page)
+   3. Add the following properties:
+      - Title (title) - Default
+      - Status (checkbox)
+      - Description (rich_text)
+      - Category (select)
+      - Order (number)
+      - Deadline (date)
+      - CompletedAt (date)
+   4. Copy the database ID from the URL:
+      - URL format: `https://www.notion.so/{workspace}/{database_id}?v=...`
+      - Copy the database_id part to your `.env` file
+
+6. Connect Integration to Database:
+   1. Open your database in Notion
+   2. Click "..." menu in the top right
+   3. Go to "Add connections"
+   4. Find and select your integration
+   5. Click "Confirm"
+
+7. Run the application:
 ```bash
 python app.py
 ```
 
-## Notion Database Configuration
+8. Access the application:
+   - Open http://localhost:5000 in your browser
+   - Default port is 5000 unless specified otherwise
 
-Your Notion database should have the following properties:
-- Title (title)
-- Status (checkbox)
-- Description (rich_text)
-- Category (select)
-- Order (number)
-- Deadline (date)
-- CompletedAt (date)
+## Troubleshooting
+
+### Common Issues
+
+1. 403 Forbidden Error:
+   - Verify your Notion token is correct
+   - Ensure the integration is connected to your database
+   - Check if all required properties exist in your database
+
+2. Database Connection Issues:
+   - Confirm database ID is correct
+   - Ensure all required properties are present
+   - Check property types match the specifications
+
+3. Task Updates Not Working:
+   - Verify your integration has write permissions
+   - Check browser console for error messages
+   - Ensure all required fields are properly formatted
 
 ## Technologies Used
 
 - Python 3.7+
-- Flask
-- Notion API
+- Flask 3.0.0
+- Flask-CORS 4.0.0
+- Notion API (notion-client 2.2.1)
 - HTML/CSS
 - JavaScript
 - Font Awesome icons
@@ -114,6 +157,14 @@ Your Notion database should have the following properties:
 - Categorize tasks by event components
 - Track completed and pending tasks
 - Share event planning progress with stakeholders
+
+## Security
+
+The application includes several security features:
+- CORS protection
+- Secret key for session management
+- Secure data handling
+- XSS protection in templates
 
 ## License
 

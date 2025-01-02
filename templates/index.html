@@ -642,7 +642,15 @@
                                 </div>
                             </div>
                             <div class="action-buttons">
-                                <button onclick="openEditModal('{{ todo.id }}', '{{ todo.title }}', '{{ todo.description }}', '{{ todo.category }}', '{{ todo.deadline.isoformat() if todo.deadline else '' }}')" class="btn btn-edit">
+                                <button 
+                                    class="btn btn-edit"
+                                    data-id="{{ todo.id }}"
+                                    data-title="{{ todo.title | replace('"', '&quot;') }}"
+                                    data-description="{{ todo.description | replace('"', '&quot;') }}"
+                                    data-category="{{ todo.category }}"
+                                    data-deadline="{{ todo.deadline.isoformat() if todo.deadline else '' }}"
+                                    onclick="openEditModal(this)"
+                                >
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <a href="{{ url_for('complete', id=todo.id) }}" class="btn {% if todo.completed %}btn-undo{% else %}btn-complete{% endif %}">
@@ -856,12 +864,22 @@
             themeIcon.className = savedTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
         });
 
-        function openEditModal(id, title, description, category, deadline) {
-            document.getElementById('editTaskId').value = id;
-            document.getElementById('editTitle').value = title;
-            document.getElementById('editDescription').value = description;
-            document.getElementById('editCategory').value = category;
-            document.getElementById('editDeadline').value = deadline;
+        function openEditModal(button) {
+            // Get data from button attributes
+            const id = button.getAttribute('data-id');
+            const title = button.getAttribute('data-title');
+            const description = button.getAttribute('data-description');
+            const category = button.getAttribute('data-category');
+            const deadline = button.getAttribute('data-deadline');
+
+            // Safely set values to form fields
+            document.getElementById('editTaskId').value = id || '';
+            document.getElementById('editTitle').value = title || '';
+            document.getElementById('editDescription').value = description || '';
+            document.getElementById('editCategory').value = category || '';
+            document.getElementById('editDeadline').value = deadline || '';
+            
+            // Show modal
             document.getElementById('editModal').style.display = 'block';
         }
 

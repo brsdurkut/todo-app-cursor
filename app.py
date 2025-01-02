@@ -4,10 +4,15 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 import pytz
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Security settings
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 
 # Notion API credentials
 NOTION_TOKEN = os.getenv('NOTION_TOKEN')
