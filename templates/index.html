@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tasks</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
@@ -859,6 +860,25 @@
         .todo-item[data-id].completed .todo-meta {
             opacity: 0.7;
         }
+
+        /* Add styles for drag ghost */
+        .sortable-ghost {
+            opacity: 0.4;
+            background-color: var(--hover-background) !important;
+        }
+
+        /* Add styles for drag chosen item */
+        .sortable-chosen {
+            background-color: var(--hover-background);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Add styles for drag animation */
+        .sortable-drag {
+            opacity: 0.8;
+            background-color: var(--card-background);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
@@ -1139,132 +1159,158 @@
                 this.classList.remove('drag-over');
                 
                 if (!draggingElement) return;
-
-                const todoId = draggingElement.dataset.id;
-                let updateData = {};
-                let shouldRefresh = false;
-
+                
+                const updateData = {};
+                draggingElement.classList.remove('dragging');
+                
                 // Handle category change
                 if (this.classList.contains('category-section')) {
                     const newCategory = this.dataset.category;
+                    const categoryContent = this.querySelector('.category-content .todo-list');
+                    if (!categoryContent) return;
+                    
                     if (newCategory !== draggingElement.dataset.category) {
                         updateData.newCategory = newCategory;
                         draggingElement.dataset.category = newCategory;
                     }
-
-                    // Get all todos in the new category section for reordering
-                    const todos = Array.from(this.children)
-                        .filter(child => child.classList.contains('todo-item'))
-                        .map(todo => todo.dataset.id);
                     
-                    // Add the dragged todo to the list if it's not already there
-                    if (!todos.includes(todoId)) {
-                        todos.push(todoId);
-                    }
-
-                    // Get the target position
-                    const targetRect = this.getBoundingClientRect();
-                    const mouseY = e.clientY;
-                    const children = Array.from(this.children).filter(child => child.classList.contains('todo-item'));
+                    // Get all todos in the category
+                    const todos = Array.from(categoryContent.children)
+                        .filter(child => child.classList.contains('todo-item'));
                     
+                    // Separate completed and incomplete tasks
+                    const incompleteTodos = todos.filter(todo => !todo.classList.contains('completed'));
+                    const completedTodos = todos.filter(todo => todo.classList.contains('completed'));
+                    
+                    // Determine if the dragged item is completed
+                    const isDraggingCompleted = draggingElement.classList.contains('completed');
+                    
+                    // Find the closest todo to insert before
                     let insertBefore = null;
-                    for (const child of children) {
-                        const childRect = child.getBoundingClientRect();
-                        const childMiddle = childRect.top + childRect.height / 2;
-                        if (mouseY < childMiddle) {
-                            insertBefore = child;
-                            break;
-                        }
-                    }
-
-                    // Insert the dragged element at the correct position
-                    if (insertBefore) {
-                        this.insertBefore(draggingElement, insertBefore);
-                    } else {
-                        this.appendChild(draggingElement);
-                    }
-
-                    // Update the order in the backend
-                    const updatedTodos = Array.from(this.children)
-                        .filter(child => child.classList.contains('todo-item'))
-                        .map(todo => todo.dataset.id);
-
-                    fetch('/reorder', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ todos: updatedTodos })
-                    })
-                    .then(response => response.json())
-                    .catch(error => {
-                        console.error('Error reordering:', error);
-                    });
-                }
-
-                // Handle day change
-                if (this.classList.contains('day-section')) {
-                    const newDate = this.dataset.date;
-                    const isCurrentlyCompleted = draggingElement.classList.contains('completed');
-                    const targetIsToday = this.dataset.completed === 'false';
                     
-                    // Only change completion status if:
-                    // 1. Task is incomplete and being moved to a past day (mark as complete)
-                    // 2. Task is incomplete and staying incomplete in today's list
-                    // Don't change completion status if:
-                    // 1. Task is complete and being moved to any day (stays complete)
-                    const newIsCompleted = isCurrentlyCompleted || (!targetIsToday);
-
-                    if (newDate !== draggingElement.dataset.date) {
-                        updateData.newDate = newDate;
-                        updateData.isCompleted = newIsCompleted;
-                        draggingElement.dataset.date = newDate;
+                    if (isDraggingCompleted) {
+                        // For completed tasks, find the first completed task that should come after
+                        insertBefore = completedTodos.find(todo => {
+                            const rect = todo.getBoundingClientRect();
+                            return e.clientY < rect.top + rect.height / 2;
+                        });
+                    } else {
+                        // For incomplete tasks, find the first incomplete task that should come after
+                        insertBefore = incompleteTodos.find(todo => {
+                            const rect = todo.getBoundingClientRect();
+                            return e.clientY < rect.top + rect.height / 2;
+                        });
                         
-                        if (newIsCompleted) {
-                            draggingElement.classList.add('completed');
-                        } else {
-                            draggingElement.classList.remove('completed');
+                        // If no incomplete task found to insert before, insert before the first completed task
+                        if (!insertBefore && completedTodos.length > 0) {
+                            insertBefore = completedTodos[0];
                         }
-                        shouldRefresh = true;  // Always refresh on day change
+                    }
+                    
+                    try {
+                        // Insert the dragged element at the new position
+                        if (insertBefore) {
+                            categoryContent.insertBefore(draggingElement, insertBefore);
+                        } else {
+                            categoryContent.appendChild(draggingElement);
+                        }
+                        
+                        // Update the order in the backend
+                        const updatedTodos = Array.from(categoryContent.children)
+                            .filter(child => child.classList.contains('todo-item'))
+                            .map(todo => todo.dataset.id);
+                        
+                        fetch('/reorder', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ todos: updatedTodos })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error reordering:', data.error);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            window.location.reload();
+                        });
+                    } catch (error) {
+                        console.error('Error updating DOM:', error);
+                        window.location.reload();
                     }
                 }
-
-                // If there are changes, send them to the server
-                if (Object.keys(updateData).length > 0) {
-                    updateData.todoId = todoId;
-                    fetch('/move', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(updateData)
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (!data.success) {
-                            console.error('Error updating todo:', data.error);
-                            window.location.reload();
-                        } else {
-                            if (shouldRefresh) {
-                                // Refresh the page to show the correct organization
-                                window.location.reload();
-                            } else if (this.classList.contains('category-section')) {
-                                // Only move the element if it's a category change within the same day
-                                const sameDay = this.closest('.day-section').dataset.date === draggingElement.dataset.date;
-                                if (sameDay) {
-                                    this.appendChild(draggingElement);
-                                } else {
-                                    window.location.reload();
-                                }
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        window.location.reload();
-                    });
-                }
+                
+                draggingElement = null;
             }
+
+            // Initialize Sortable for each todo list within category content
+            document.querySelectorAll('.category-content .todo-list').forEach(todoList => {
+                console.log('Initializing Sortable for list:', todoList);
+                new Sortable(todoList, {
+                    group: 'todos',
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    dragClass: 'sortable-drag',
+                    handle: '.todo-item',
+                    onEnd: function(evt) {
+                        console.log('Drag ended:', {
+                            item: evt.item.dataset.id,
+                            from: evt.from.closest('.category-section')?.dataset.category,
+                            to: evt.to.closest('.category-section')?.dataset.category,
+                            newIndex: evt.newIndex,
+                            oldIndex: evt.oldIndex,
+                            isCompleted: evt.item.classList.contains('completed')
+                        });
+
+                        // Get all todos in the target list
+                        const todos = Array.from(evt.to.children)
+                            .filter(child => child.classList.contains('todo-item'))
+                            .map(todo => todo.dataset.id);
+                        
+                        console.log('Sending reorder request with todos:', todos);
+                        
+                        // Update order on server
+                        fetch('/reorder', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ todos: todos })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error reordering:', data.error);
+                                evt.from.insertBefore(evt.item, evt.oldIndex);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            evt.from.insertBefore(evt.item, evt.oldIndex);
+                        });
+                    }
+                });
+            });
+
+            // Remove old drag & drop event listeners
+            document.querySelectorAll('.todo-item').forEach(item => {
+                item.removeAttribute('draggable');
+            });
         });
 
         // Theme toggle functionality

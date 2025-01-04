@@ -7,6 +7,7 @@ import pytz
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 import time
+import logging
 
 load_dotenv()
 
@@ -21,6 +22,13 @@ NOTION_TOKEN = os.getenv('NOTION_TOKEN')
 DATABASE_ID = os.getenv('NOTION_DATABASE_ID')
 
 notion = Client(auth=NOTION_TOKEN)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def get_utc_now():
     return datetime.now(pytz.UTC)
@@ -82,10 +90,18 @@ def create_todo(title, description="", deadline=None, category_name=None):
     try:
         # Get the current maximum order
         todos = get_todos()
-        max_order = 0
+        
+        # Find the last incomplete todo's order
+        last_incomplete_order = None
         for todo in todos:
-            current_order = todo['properties'].get('Order', {}).get('number', 0)
-            max_order = max(max_order, current_order or 0)
+            if not todo['properties'].get('Status', {}).get('checkbox', False):
+                order_text = todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '')
+                if order_text:
+                    last_incomplete_order = order_text
+
+        # Generate new order value
+        new_order = get_lexorank_between(last_incomplete_order, None, False)
+        logger.debug(f"Creating new todo with order {new_order}")
 
         properties = {
             "Title": {
@@ -110,7 +126,7 @@ def create_todo(title, description="", deadline=None, category_name=None):
                 "checkbox": False
             },
             "Order": {
-                "number": max_order + 1000
+                "rich_text": [{"text": {"content": new_order}}]
             }
         }
 
@@ -136,7 +152,7 @@ def create_todo(title, description="", deadline=None, category_name=None):
         )
         return True
     except Exception as e:
-        print(f"Error creating todo: {e}")
+        logger.error(f"Error creating todo: {e}")
         return False
 
 def update_todo_order(page_id, new_order):
@@ -145,13 +161,13 @@ def update_todo_order(page_id, new_order):
             page_id=page_id,
             properties={
                 "Order": {
-                    "number": new_order
+                    "rich_text": [{"text": {"content": new_order}}]
                 }
             }
         )
         return True
     except Exception as e:
-        print(f"Error updating todo order: {e}")
+        logger.error(f"Error updating todo order: {e}")
         return False
 
 def update_todo_category(page_id, new_category):
@@ -256,19 +272,111 @@ def update_todo(page_id, title, description="", deadline=None, category_name=Non
         print(f"Error updating todo: {e}")
         return False
 
+def get_lexorank_between(prev_rank=None, next_rank=None, is_completed=False):
+    """Generate a lexicographically ordered string rank between prev_rank and next_rank"""
+    logger.debug(f"Generating lexorank: prev_rank={prev_rank}, next_rank={next_rank}, is_completed={is_completed}")
+    
+    BASE_36_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    MIN_RANK = "0"
+    MAX_RANK = "ZZZZZZZZZZ"  # 10 characters max
+    COMPLETED_PREFIX = "Z"  # Ensures completed tasks are always after incomplete ones
+    
+    # If no ranks provided, return middle of available range
+    if not prev_rank and not next_rank:
+        result = COMPLETED_PREFIX + "5" + "0" * 8 if is_completed else "5" + "0" * 9
+        logger.debug(f"No ranks provided, returning middle rank: {result}")
+        return result
+    
+    # Handle edge cases
+    if not prev_rank:
+        prev_rank = MIN_RANK if not is_completed else COMPLETED_PREFIX + MIN_RANK
+        logger.debug(f"No prev_rank, using: {prev_rank}")
+    if not next_rank:
+        next_rank = MAX_RANK if is_completed else COMPLETED_PREFIX + MIN_RANK
+        logger.debug(f"No next_rank, using: {next_rank}")
+        
+    # Ensure proper length
+    prev_rank = prev_rank.ljust(10, '0')
+    next_rank = next_rank.ljust(10, '0')
+    logger.debug(f"Padded ranks: prev={prev_rank}, next={next_rank}")
+    
+    # If ranks are consecutive in BASE_36, create a mid rank
+    if ord(next_rank[-1]) - ord(prev_rank[-1]) == 1:
+        prev_rank = prev_rank[:-1] + BASE_36_CHARS[(BASE_36_CHARS.index(prev_rank[-1]) + 1) % 36]
+        logger.debug(f"Adjusted consecutive ranks, new prev_rank: {prev_rank}")
+    
+    # Find the midpoint
+    mid_rank = ""
+    for i in range(10):
+        prev_char = prev_rank[i] if i < len(prev_rank) else '0'
+        next_char = next_rank[i] if i < len(next_rank) else 'Z'
+        
+        prev_index = BASE_36_CHARS.index(prev_char)
+        next_index = BASE_36_CHARS.index(next_char)
+        
+        if next_index == prev_index:
+            mid_rank += prev_char
+            continue
+            
+        mid_index = (prev_index + next_index) // 2
+        mid_rank += BASE_36_CHARS[mid_index]
+        break
+    
+    # Pad to 10 characters
+    mid_rank = mid_rank.ljust(10, '0')
+    logger.debug(f"Generated mid_rank: {mid_rank}")
+    
+    # Add completed prefix if needed
+    if is_completed and not mid_rank.startswith(COMPLETED_PREFIX):
+        mid_rank = COMPLETED_PREFIX + mid_rank[1:]
+        logger.debug(f"Added completed prefix, final rank: {mid_rank}")
+        
+    return mid_rank
+
 @app.route('/reorder', methods=['POST'])
 def reorder():
     try:
         data = request.get_json()
         todos = data.get('todos', [])
+        logger.info(f"Reordering {len(todos)} todos")
         
-        # Update each todo's order
-        for index, todo_id in enumerate(todos):
-            update_todo_order(todo_id, (index + 1) * 1000)
+        # Update orders with retry mechanism
+        prev_rank = None
+        for todo_id in todos:
+            try:
+                # Get current todo status
+                page = notion.pages.retrieve(page_id=todo_id)
+                is_completed = page['properties']['Status']['checkbox']
+                
+                # Generate new rank
+                new_rank = get_lexorank_between(prev_rank, None, is_completed)
+                logger.debug(f"Updating todo {todo_id} with rank {new_rank} (prev_rank={prev_rank})")
+                
+                # Update the todo with new rank
+                success = update_notion_with_retry(
+                    todo_id,
+                    {
+                        "Order": {
+                            "rich_text": [{"text": {"content": new_rank}}]
+                        }
+                    }
+                )
+                
+                if not success:
+                    logger.error(f"Failed to update order for todo {todo_id}")
+                    return jsonify({"success": False, "error": f"Failed to update order for todo {todo_id}"}), 500
+                
+                prev_rank = new_rank
+                
+            except Exception as e:
+                logger.error(f"Error updating todo {todo_id}: {e}")
+                return jsonify({"success": False, "error": f"Error updating todo {todo_id}: {e}"}), 500
         
+        logger.info("Reordering completed successfully")
         return jsonify({"success": True})
+        
     except Exception as e:
-        print(f"Error in reorder: {e}")
+        logger.error(f"Error in reorder: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 def toggle_todo(page_id):
@@ -278,51 +386,58 @@ def toggle_todo(page_id):
         current_status = page['properties']['Status']['checkbox']
         now = get_utc_now()
         
-        # Determine new status
+        # Toggle status
         new_status = not current_status
         
-        # If task is completed, find the highest order number and add to it
+        # Get all todos to determine new order
+        todos = get_todos()
+        
+        # Find appropriate order value
         new_order = None
         if new_status:  # If task is being completed
-            todos = get_todos()
-            max_order = 0
+            # Find the last completed task's order
+            last_completed_order = None
             for todo in todos:
-                current_order = todo['properties'].get('Order', {}).get('number', 0)
-                max_order = max(max_order, current_order or 0)
-            new_order = max_order + 1000
-
+                if todo['properties'].get('Status', {}).get('checkbox', True):
+                    order_text = todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '')
+                    if order_text:
+                        last_completed_order = order_text
+            new_order = get_lexorank_between(last_completed_order, None, True)
+        else:  # If task is being uncompleted
+            # Find the last incomplete task's order
+            last_incomplete_order = None
+            for todo in todos:
+                if not todo['properties'].get('Status', {}).get('checkbox', False):
+                    order_text = todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '')
+                    if order_text:
+                        last_incomplete_order = order_text
+            new_order = get_lexorank_between(last_incomplete_order, None, False)
+        
+        logger.debug(f"Toggling todo {page_id} to {new_status} with new order {new_order}")
+        
         # Prepare properties update
         properties = {
             "Status": {
-                "type": "checkbox",
                 "checkbox": new_status
+            },
+            "Order": {
+                "rich_text": [{"text": {"content": new_order}}]
             }
         }
         
         if new_status:
             # If task is being completed, set completion date to now
             properties["CompletedAt"] = {
-                "type": "date",
                 "date": {
                     "start": now.isoformat()
                 }
             }
         else:
-            # If task is being uncompleted:
-            # 1. Remove completion date
-            # 2. Move task to today by updating CompletedAt to None
+            # If task is being uncompleted, remove completion date
             properties["CompletedAt"] = {
-                "type": "date",
                 "date": None
             }
         
-        # Add new order if determined
-        if new_order is not None:
-            properties["Order"] = {
-                "type": "number",
-                "number": new_order
-            }
-
         # Update the page
         notion.pages.update(
             page_id=page_id,
@@ -330,7 +445,7 @@ def toggle_todo(page_id):
         )
         return True
     except Exception as e:
-        print(f"Error toggling todo: {e}")
+        logger.error(f"Error toggling todo: {e}")
         return False
 
 def delete_todo(page_id):
@@ -477,7 +592,7 @@ def index():
                 'created_at': datetime.fromisoformat(todo['created_time'].replace('Z', '+00:00')).astimezone(local_tz),
                 'completed_at': completed_date,
                 'deadline': deadline_date,
-                'order': todo['properties'].get('Order', {}).get('number', 0)
+                'order': todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '0')
             }
             
             # Determine which day to show the todo
@@ -523,6 +638,7 @@ def index():
         for category in day_data['categories'].values():
             category.sort(key=lambda x: (
                 x['completed'],
+                x['order'],
                 x['deadline'] if x['deadline'] else datetime.max.replace(tzinfo=pytz.UTC),
                 x['completed_at'] if x['completed_at'] else x['created_at']
             ))
@@ -600,16 +716,21 @@ def delete(id):
 def update_notion_with_retry(page_id, properties, max_retries=3, delay=0.5):
     for attempt in range(max_retries):
         try:
+            logger.debug(f"Updating notion page {page_id} (attempt {attempt + 1}/{max_retries})")
+            logger.debug(f"Properties: {properties}")
+            
             notion.pages.update(
                 page_id=page_id,
                 properties=properties
             )
+            logger.debug(f"Successfully updated page {page_id}")
             return True
         except Exception as e:
             if "Conflict" in str(e) and attempt < max_retries - 1:
+                logger.warning(f"Conflict error updating page {page_id}, retrying in {delay * (attempt + 1)}s")
                 time.sleep(delay * (attempt + 1))  # Exponential backoff
                 continue
-            print(f"Error updating todo (attempt {attempt + 1}/{max_retries}): {e}")
+            logger.error(f"Error updating todo (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt == max_retries - 1:
                 raise
     return False
