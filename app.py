@@ -53,10 +53,20 @@ def get_todos():
                     }
                 ],
                 "filter": {
-                    "property": "Title",
-                    "title": {
-                        "is_not_empty": True
-                    }
+                    "and": [
+                        {
+                            "property": "Title",
+                            "title": {
+                                "is_not_empty": True
+                            }
+                        },
+                        {
+                            "property": "IsLater",
+                            "checkbox": {
+                                "equals": False
+                            }
+                        }
+                    ]
                 },
                 "page_size": 100
             }
@@ -73,6 +83,58 @@ def get_todos():
         return all_results
     except Exception as e:
         print(f"Error fetching todos: {e}")
+        return []
+
+def get_later_todos():
+    try:
+        all_results = []
+        has_more = True
+        next_cursor = None
+        
+        while has_more:
+            query_params = {
+                "database_id": DATABASE_ID,
+                "sorts": [
+                    {
+                        "property": "Status",
+                        "direction": "ascending"
+                    },
+                    {
+                        "property": "Order",
+                        "direction": "ascending"
+                    }
+                ],
+                "filter": {
+                    "and": [
+                        {
+                            "property": "Title",
+                            "title": {
+                                "is_not_empty": True
+                            }
+                        },
+                        {
+                            "property": "IsLater",
+                            "checkbox": {
+                                "equals": True
+                            }
+                        }
+                    ]
+                },
+                "page_size": 100
+            }
+            
+            if next_cursor:
+                query_params["start_cursor"] = next_cursor
+            
+            response = notion.databases.query(**query_params)
+            results = response.get('results', [])
+            all_results.extend(results)
+            has_more = response.get('has_more', False)
+            next_cursor = response.get('next_cursor')
+        
+        return all_results
+    except Exception as e:
+        print(f"Error fetching later todos: {e}")
         return []
 
 def get_categories():
@@ -1154,6 +1216,123 @@ def delete_recurring(id):
     except Exception as e:
         print(f"Error deleting recurring task: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/later')
+def later_tasks():
+    todos = get_later_todos()
+    categories = get_categories()
+    now = get_utc_now()
+    
+    # Get user's local timezone
+    local_tz = pytz.timezone('Europe/Istanbul')
+    today = now.astimezone(local_tz).date()
+    
+    # Dictionary to store todos grouped by category
+    grouped_todos = {}
+    
+    for todo in todos:
+        try:
+            title = todo['properties'].get('Title', {}).get('title', [])
+            title_content = title[0]['text']['content'] if title else 'Untitled'
+            
+            description = todo['properties'].get('Description', {}).get('rich_text', [])
+            description_content = description[0]['text']['content'] if description else ''
+            
+            # Get deadline
+            deadline = todo['properties'].get('Deadline', {}).get('date', {})
+            deadline_date = None
+            if deadline and deadline.get('start'):
+                deadline_date = datetime.fromisoformat(deadline['start'].replace('Z', '+00:00')).astimezone(local_tz)
+            
+            # Get category
+            category = todo['properties'].get('Category', {}).get('select', {})
+            category_name = category.get('name', '') if category else 'Uncategorized'
+            
+            # Get completion status
+            is_completed = todo['properties'].get('Status', {}).get('checkbox', False)
+            
+            # Format the todo
+            formatted_todo = {
+                'id': todo['id'],
+                'title': title_content,
+                'description': description_content,
+                'category': category_name,
+                'completed': is_completed,
+                'deadline': deadline_date,
+                'order': todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '0')
+            }
+            
+            # Initialize the category if it doesn't exist
+            if category_name not in grouped_todos:
+                grouped_todos[category_name] = []
+            
+            # Add the todo to its category
+            grouped_todos[category_name].append(formatted_todo)
+            
+        except Exception as e:
+            print(f"Error formatting todo: {e}")
+            continue
+    
+    # Sort categories with Uncategorized always first
+    sorted_categories = dict(sorted(
+        grouped_todos.items(),
+        key=lambda x: ('1' if x[0] == '' or x[0] == 'Uncategorized' else '2' + x[0].lower())
+    ))
+    
+    return render_template('later.html', grouped_todos=sorted_categories, categories=categories, now=now)
+
+@app.route('/toggle-later/<string:id>')
+def toggle_later_route(id):
+    toggle_later(id)
+    referrer = request.referrer
+    if referrer and 'later' in referrer:
+        return redirect(url_for('later_tasks'))
+    return redirect(url_for('index'))
+
+def toggle_later(page_id):
+    try:
+        # Get current later status
+        page = notion.pages.retrieve(page_id=page_id)
+        current_status = page['properties'].get('IsLater', {}).get('checkbox', False)
+        
+        # Toggle status
+        new_status = not current_status
+        
+        # Update the page
+        notion.pages.update(
+            page_id=page_id,
+            properties={
+                "IsLater": {
+                    "checkbox": new_status
+                }
+            }
+        )
+        
+        # If removing from later, update the order for current day
+        if not new_status:
+            todos = get_todos()
+            last_incomplete_order = None
+            for todo in todos:
+                if not todo['properties'].get('Status', {}).get('checkbox', False):
+                    order_text = todo['properties'].get('Order', {}).get('rich_text', [{}])[0].get('text', {}).get('content', '')
+                    if order_text:
+                        last_incomplete_order = order_text
+            
+            new_order = get_lexorank_between(last_incomplete_order, None, False)
+            
+            notion.pages.update(
+                page_id=page_id,
+                properties={
+                    "Order": {
+                        "rich_text": [{"text": {"content": new_order}}]
+                    }
+                }
+            )
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error toggling later status: {e}")
+        return False
 
 if __name__ == '__main__':
     if not NOTION_TOKEN or not DATABASE_ID:

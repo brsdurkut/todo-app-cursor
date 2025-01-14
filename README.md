@@ -1,6 +1,6 @@
 # Todo Application
 
-A Flask-based todo application integrated with Notion API, featuring a modern UI with drag & drop functionality, recurring tasks, and dark/light theme support.
+A Flask-based todo application integrated with Notion API, featuring a modern UI with drag & drop functionality, recurring tasks, later tasks, and dark/light theme support.
 
 ## Features
 
@@ -12,6 +12,15 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 - Improved drag & drop functionality with smoother animations
 - Enhanced error handling for concurrent updates
 - Optimized task updates with retry mechanism
+
+### Later Tasks
+- Mark tasks for later to reduce clutter in main task list
+- Separate page for managing later tasks
+- Easy to move tasks back to main list
+- Cannot mark completed tasks for later
+- Cannot complete/uncomplete tasks in later list
+- Preserves task details and categories
+- Automatic task organization when moving back to main list
 
 ### Recurring Tasks
 - Create recurring tasks with different patterns:
@@ -57,7 +66,10 @@ A Flask-based todo application integrated with Notion API, featuring a modern UI
 
 ### User Interface
 - Clean, modern design with sidebar navigation
-- Separate pages for tasks and recurring tasks
+- Separate pages for:
+  - Main tasks
+  - Later tasks
+  - Recurring tasks
 - Dark/light theme support with persistent preference
 - Responsive layout
 - Visual feedback for all interactions
@@ -122,6 +134,7 @@ FLASK_SECRET_KEY=your_secret_key_here  # Optional, defaults to a secure value if
       - RecurrenceInterval (number)
       - LastGenerated (date)
       - RecurringParentId (rich_text)
+      - IsLater (checkbox)
    4. Copy the database ID from the URL:
       - URL format: `https://www.notion.so/{workspace}/{database_id}?v=...`
       - Copy the database_id part to your `.env` file
@@ -192,6 +205,7 @@ python app.py
 - Monitor task completion status
 - Organize tasks by completion date
 - Create recurring tasks for regular activities
+- Mark less urgent tasks for later
 
 ### Project Management
 - Create and organize project milestones
@@ -200,6 +214,7 @@ python app.py
 - Maintain project documentation in Notion
 - Group related tasks by category
 - Set up recurring project meetings and reviews
+- Postpone non-critical tasks for later
 
 ### Academic Planning
 - Manage course assignments and deadlines
@@ -208,6 +223,7 @@ python app.py
 - Coordinate group project tasks
 - Categorize tasks by subject or priority
 - Create recurring study sessions
+- Save reference materials for later review
 
 ### Event Planning
 - Create checklists for event preparations
@@ -216,6 +232,7 @@ python app.py
 - Track completed and pending tasks
 - Share event planning progress with stakeholders
 - Set up recurring event maintenance tasks
+- Store ideas and inspiration for later
 
 ## Security
 

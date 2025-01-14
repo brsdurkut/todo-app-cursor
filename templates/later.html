@@ -1,0 +1,91 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="header">
+    <h1>Later Tasks</h1>
+    <button class="theme-toggle" onclick="toggleTheme()">
+        <i class="fas fa-moon"></i>
+    </button>
+</div>
+
+<div class="later-tasks-container">
+    {% if grouped_todos %}
+        {% for category, todos in grouped_todos.items() %}
+        <div class="category-section" data-category="{{ category }}">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <h3>
+                    <i class="fas fa-folder"></i>
+                    {{ category }}
+                    <span class="todo-count">({{ todos|length }})</span>
+                </h3>
+                <i class="fas fa-chevron-down category-toggle-icon"></i>
+            </div>
+            <div class="category-content">
+                <div class="todo-list">
+                    {% for todo in todos %}
+                        <div class="todo-item {% if todo.completed %}completed{% endif %}" data-id="{{ todo.id }}" draggable="true">
+                            <div class="todo-content">
+                                <div class="todo-title">{{ todo.title }}</div>
+                                {% if todo.description %}
+                                    <div class="todo-description">{{ todo.description }}</div>
+                                {% endif %}
+                                <div class="todo-meta">
+                                    {% if todo.deadline %}
+                                        <span class="todo-date">
+                                            <i class="far fa-calendar"></i>
+                                            {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="todo-actions">
+                                <a href="{{ url_for('toggle_later_route', id=todo.id) }}" class="action-btn later-btn" title="Remove from Later">
+                                    <i class="fas fa-clock"></i>
+                                </a>
+                                <button class="action-btn edit-btn" onclick="editTodo('{{ todo.id }}', '{{ todo.title|replace('\'', '\\\'') }}', '{{ todo.description|replace('\'', '\\\'') }}', '{{ todo.deadline.isoformat() if todo.deadline else '' }}', '{{ todo.category }}')">
+                                    <i class="far fa-edit"></i>
+                                </button>
+                                <a href="{{ url_for('delete', id=todo.id) }}" class="action-btn delete-btn" onclick="return confirm('Are you sure you want to delete this task?')">
+                                    <i class="far fa-trash-alt"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            No tasks marked for later
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .later-tasks-container {
+        margin-top: 2.5rem;
+        padding: 0 1rem;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--text-secondary);
+        background: var(--card-background);
+        border-radius: 12px;
+        border: 2px dashed var(--border-color);
+        margin: 0 1rem;
+        font-size: 1.1rem;
+    }
+
+    .later-btn {
+        color: var(--system-blue);
+    }
+
+    .later-btn:hover {
+        color: var(--system-blue);
+        opacity: 0.8;
+    }
+</style>
+{% endblock %} 

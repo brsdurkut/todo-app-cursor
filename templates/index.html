@@ -1281,6 +1281,16 @@
         .modal .new-category-actions .btn i {
             font-size: 0.875rem;
         }
+
+        /* Add Later button styles */
+        .later-btn {
+            color: var(--system-blue);
+        }
+
+        .later-btn:hover {
+            color: var(--system-blue);
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -1290,6 +1300,10 @@
                 <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
                     <i class="fas fa-tasks"></i>
                     Tasks
+                </a>
+                <a href="{{ url_for('later_tasks') }}" class="nav-link {% if request.endpoint == 'later_tasks' %}active{% endif %}">
+                    <i class="fas fa-clock"></i>
+                    Later Tasks
                 </a>
                 <a href="{{ url_for('recurring_tasks_page') }}" class="nav-link {% if request.endpoint == 'recurring_tasks_page' %}active{% endif %}">
                     <i class="fas fa-sync"></i>
@@ -1398,6 +1412,11 @@
                                                     </div>
                                                 </div>
                                                 <div class="todo-actions">
+                                                    {% if not todo.completed %}
+                                                    <a href="{{ url_for('toggle_later_route', id=todo.id) }}" class="action-btn later-btn" title="Mark for Later">
+                                                        <i class="fas fa-clock"></i>
+                                                    </a>
+                                                    {% endif %}
                                                     <a href="{{ url_for('complete', id=todo.id) }}" class="action-btn complete-btn">
                                                         <i class="far {% if todo.completed %}fa-check-square{% else %}fa-square{% endif %}"></i>
                                                     </a>
@@ -1433,6 +1452,11 @@
                                             </div>
                                         </div>
                                         <div class="todo-actions">
+                                            {% if not todo.completed %}
+                                            <a href="{{ url_for('toggle_later_route', id=todo.id) }}" class="action-btn later-btn" title="Mark for Later">
+                                                <i class="fas fa-clock"></i>
+                                            </a>
+                                            {% endif %}
                                             <a href="{{ url_for('complete', id=todo.id) }}" class="action-btn complete-btn">
                                                 <i class="far {% if todo.completed %}fa-check-square{% else %}fa-square{% endif %}"></i>
                                             </a>
