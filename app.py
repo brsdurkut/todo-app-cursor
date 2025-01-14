@@ -609,8 +609,28 @@ def index():
     local_tz = pytz.timezone('Europe/Istanbul')  # Türkiye için
     today = now.astimezone(local_tz).date()
     
+    # Calculate the end of this week (Sunday)
+    week_end = today + timedelta(days=(6 - today.weekday()))
+    
     # Dictionary to store todos grouped by day and category
     grouped_todos = {}
+    
+    # Initialize Today and This Week sections
+    today_str = today.strftime('%Y-%m-%d')
+    grouped_todos[today_str] = {
+        'date': today,
+        'categories': {},
+        'section': 'today'
+    }
+    
+    # Initialize This Week section with tomorrow's date
+    tomorrow = today + timedelta(days=1)
+    this_week_str = tomorrow.strftime('%Y-%m-%d')
+    grouped_todos[this_week_str] = {
+        'date': tomorrow,
+        'categories': {},
+        'section': 'this_week'
+    }
     
     for todo in todos:
         try:
@@ -660,7 +680,7 @@ def index():
             # Determine which day to show the todo
             if is_completed and completed_date:
                 display_date = completed_date.date()
-            elif deadline_date and deadline_date.date() >= today:
+            elif deadline_date:
                 display_date = deadline_date.date()
             else:
                 display_date = today
@@ -671,8 +691,16 @@ def index():
             if day_str not in grouped_todos:
                 grouped_todos[day_str] = {
                     'date': display_date,
-                    'categories': {}
+                    'categories': {},
+                    'section': 'past'  # Default section
                 }
+            
+            # Update section based on date
+            if not is_completed:  # Only uncompleted tasks should be in Today or This Week
+                if display_date == today:
+                    grouped_todos[day_str]['section'] = 'today'
+                elif today < display_date <= week_end:
+                    grouped_todos[day_str]['section'] = 'this_week'
             
             # Initialize the category if it doesn't exist for this day
             if category_name not in grouped_todos[day_str]['categories']:
@@ -686,7 +714,12 @@ def index():
             continue
     
     # Sort days in reverse chronological order
-    sorted_days = sorted(grouped_todos.items(), key=lambda x: x[1]['date'], reverse=True)
+    sorted_days = sorted(grouped_todos.items(), key=lambda x: (
+        # Sort by section (today first, then this_week, then past)
+        0 if x[1]['section'] == 'today' else 1 if x[1]['section'] == 'this_week' else 2,
+        # Then by date
+        x[1]['date']
+    ))
     
     # For each day, sort categories alphabetically and sort todos within categories
     for day_str, day_data in grouped_todos.items():
@@ -705,7 +738,12 @@ def index():
                 x['completed_at'] if x['completed_at'] else x['created_at']
             ))
     
-    return render_template('index.html', grouped_todos=sorted_days, categories=categories, now=now)
+    return render_template('index.html', 
+                         grouped_todos=sorted_days, 
+                         categories=categories, 
+                         now=now,
+                         today=today,
+                         week_end=week_end)
 
 @app.route('/recurring')
 def recurring_tasks_page():
@@ -803,7 +841,7 @@ def move_todo():
         data = request.get_json()
         todo_id = data.get('todoId')
         new_category = data.get('newCategory')
-        new_date = data.get('newDate')
+        new_section = data.get('newSection')  # 'today' or 'this_week'
         is_completed = data.get('isCompleted', False)
         
         # Prepare properties for a single update
@@ -817,33 +855,27 @@ def move_todo():
                 } if new_category != "Uncategorized" else None
             }
         
-        # Add completion status and date if needed
-        if new_date is not None:
-            try:
-                completion_date = datetime.fromisoformat(new_date) if new_date else None
-                if completion_date:
-                    # Convert to UTC if it's not already
-                    if not completion_date.tzinfo:
-                        local_tz = pytz.timezone('Europe/Istanbul')
-                        completion_date = local_tz.localize(completion_date).astimezone(pytz.UTC)
-                
-                properties["Status"] = {
-                    "checkbox": is_completed
+        # Update deadline based on section
+        if new_section is not None:
+            now = get_utc_now()
+            local_tz = pytz.timezone('Europe/Istanbul')
+            today = now.astimezone(local_tz).date()
+            
+            if new_section == 'today':
+                # Set deadline to today
+                deadline = datetime.combine(today, datetime.min.time())
+                deadline = local_tz.localize(deadline).astimezone(pytz.UTC)
+            else:  # this_week
+                # Set deadline to tomorrow for "This Week" section
+                tomorrow = today + timedelta(days=1)
+                deadline = datetime.combine(tomorrow, datetime.min.time())
+                deadline = local_tz.localize(deadline).astimezone(pytz.UTC)
+            
+            properties["Deadline"] = {
+                "date": {
+                    "start": deadline.isoformat()
                 }
-                
-                if is_completed and completion_date:
-                    properties["CompletedAt"] = {
-                        "date": {
-                            "start": completion_date.isoformat()
-                        }
-                    }
-                else:
-                    properties["CompletedAt"] = {
-                        "date": None
-                    }
-            except ValueError as e:
-                print(f"Error parsing date: {e}")
-                return jsonify({"success": False, "error": "Invalid date format"}), 400
+            }
         
         # Make a single API call to update everything with retry logic
         if properties:

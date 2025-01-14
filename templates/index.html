@@ -1291,6 +1291,60 @@
             color: var(--system-blue);
             opacity: 0.8;
         }
+
+        .completed-section {
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .completed-section .todo-item {
+            opacity: 0.8;
+            background-color: var(--hover-background);
+        }
+
+        .completed-section .todo-item:hover {
+            opacity: 1;
+        }
+
+        .completed-section .todo-title,
+        .completed-section .todo-description {
+            text-decoration: line-through;
+            color: var(--text-secondary);
+        }
+
+        .completed-section .todo-meta {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .completed-section .todo-date {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--card-background);
+            border-radius: 6px;
+            margin-right: 1rem;
+        }
+
+        .completed-section .day-header h2 {
+            color: var(--system-green);
+        }
+
+        .completed-section .day-header h2 i {
+            color: var(--system-green);
+        }
+
+        .empty-category-placeholder {
+            padding: 1.5rem;
+            text-align: center;
+            color: var(--text-secondary);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            margin: 1rem 0;
+            background-color: var(--hover-background);
+        }
     </style>
 </head>
 <body>
@@ -1377,10 +1431,23 @@
                 <div class="todo-list" id="todoList">
                     {% if grouped_todos %}
                         {% for day_str, day_data in grouped_todos %}
-                        <div class="day-section" data-date="{{ day_str }}" data-completed="{{ 'true' if day_str != now.strftime('%Y-%m-%d') else 'false' }}">
+                        <div class="day-section" data-date="{{ day_str }}" data-section="{{ day_data.section }}">
                             <div class="day-header">
-                                <h2>{{ day_data.date.strftime('%A, %d %B %Y') }}</h2>
+                                <h2>
+                                    {% if day_data.section == 'today' %}
+                                        <i class="fas fa-calendar-day"></i> Today
+                                    {% elif day_data.section == 'this_week' %}
+                                        <i class="fas fa-calendar-week"></i> This Week ({{ today.strftime('%d %B') }} - {{ week_end.strftime('%d %B') }})
+                                    {% else %}
+                                        <i class="fas fa-calendar"></i> {{ day_data.date.strftime('%A, %d %B %Y') }}
+                                    {% endif %}
+                                </h2>
                             </div>
+                            {% if day_data.categories|length == 0 %}
+                            <div class="empty-category-placeholder">
+                                Drop tasks here
+                            </div>
+                            {% endif %}
                             {% for category, todos in day_data.categories.items() %}
                             {% if category and category != 'Uncategorized' %}
                             <div class="category-section" data-category="{{ category }}">
@@ -1396,17 +1463,22 @@
                                     <div class="todo-list">
                                         {% for todo in todos %}
                                             <div class="todo-item {% if todo.completed %}completed{% endif %}" data-id="{{ todo.id }}" draggable="true">
-                                                <!-- Existing todo item content -->
                                                 <div class="todo-content">
                                                     <div class="todo-title">{{ todo.title }}</div>
                                                     {% if todo.description %}
                                                         <div class="todo-description">{{ todo.description }}</div>
                                                     {% endif %}
                                                     <div class="todo-meta">
+                                                        {% if todo.completed_at %}
+                                                            <span class="todo-date">
+                                                                <i class="fas fa-check"></i>
+                                                                Completed on {{ todo.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                                                            </span>
+                                                        {% endif %}
                                                         {% if todo.deadline %}
                                                             <span class="todo-date">
                                                                 <i class="far fa-calendar"></i>
-                                                                {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
+                                                                Due {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
                                                             </span>
                                                         {% endif %}
                                                     </div>
@@ -1443,10 +1515,16 @@
                                                 <div class="todo-description">{{ todo.description }}</div>
                                             {% endif %}
                                             <div class="todo-meta">
+                                                {% if todo.completed_at %}
+                                                    <span class="todo-date">
+                                                        <i class="fas fa-check"></i>
+                                                        Completed on {{ todo.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                                                    </span>
+                                                {% endif %}
                                                 {% if todo.deadline %}
                                                     <span class="todo-date">
                                                         <i class="far fa-calendar"></i>
-                                                        {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
+                                                        Due {{ todo.deadline.strftime('%Y-%m-%d %H:%M') }}
                                                     </span>
                                                 {% endif %}
                                             </div>
@@ -1469,6 +1547,12 @@
                                         </div>
                                     </div>
                                 {% endfor %}
+                                <!-- Empty state placeholder for drag-drop -->
+                                {% if not todos %}
+                                <div class="empty-category-placeholder">
+                                    Drop tasks here
+                                </div>
+                                {% endif %}
                             </div>
                             {% endif %}
                             {% endfor %}
@@ -1604,6 +1688,14 @@
                 item.addEventListener('dragend', handleDragEnd);
             });
 
+            // Add drag & drop event listeners to empty placeholders
+            document.querySelectorAll('.empty-category-placeholder').forEach(placeholder => {
+                placeholder.addEventListener('dragover', handleDragOver);
+                placeholder.addEventListener('drop', handleDrop);
+                placeholder.addEventListener('dragenter', handleDragEnter);
+                placeholder.addEventListener('dragleave', handleDragLeave);
+            });
+
             // Add drag & drop event listeners to category sections
             document.querySelectorAll('.category-section').forEach(section => {
                 section.addEventListener('dragover', handleDragOver);
@@ -1623,17 +1715,24 @@
             function handleDragStart(e) {
                 draggingElement = this;
                 this.classList.add('dragging');
+                // Store the original section and category
+                const originalSection = this.closest('.day-section').dataset.section;
+                const originalCategory = this.closest('.category-section')?.dataset.category || '';
+                this.dataset.originalSection = originalSection;
+                this.dataset.originalCategory = originalCategory;
+                e.dataTransfer.effectAllowed = 'move';
             }
 
             function handleDragEnd(e) {
                 this.classList.remove('dragging');
-                document.querySelectorAll('.category-section, .day-section').forEach(item => {
+                document.querySelectorAll('.category-section, .day-section, .empty-category-placeholder').forEach(item => {
                     item.classList.remove('drag-over');
                 });
             }
 
             function handleDragOver(e) {
                 e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
             }
 
             function handleDragEnter(e) {
@@ -1654,8 +1753,153 @@
                 const updateData = {};
                 draggingElement.classList.remove('dragging');
                 
-                // Handle category change
-                if (this.classList.contains('category-section')) {
+                // Handle drop on empty placeholder
+                if (this.classList.contains('empty-category-placeholder')) {
+                    const daySection = this.closest('.day-section');
+                    if (daySection) {
+                        const newSection = daySection.dataset.section;
+                        updateData.newSection = newSection;
+                        
+                        // Create or get the uncategorized todo list
+                        let todoList = daySection.querySelector('.todo-list[data-category=""]');
+                        if (!todoList) {
+                            todoList = document.createElement('div');
+                            todoList.className = 'todo-list';
+                            todoList.setAttribute('data-category', '');
+                            daySection.appendChild(todoList);
+                        }
+                        
+                        // Remove the placeholder
+                        this.remove();
+                        
+                        // Add the todo to the list
+                        todoList.appendChild(draggingElement);
+                        
+                        // Update the backend
+                        fetch('/move', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                todoId: draggingElement.dataset.id,
+                                newSection: newSection
+                            })
+                        });
+                    }
+                    return;
+                }
+                
+                // Handle section change
+                if (this.classList.contains('day-section')) {
+                    const newSection = this.dataset.section;
+                    const originalSection = draggingElement.dataset.originalSection;
+                    
+                    if (newSection !== originalSection) {
+                        updateData.newSection = newSection;
+                        draggingElement.dataset.section = newSection;
+                    }
+                    
+                    // Get the appropriate container in the new section
+                    const category = draggingElement.closest('.category-section')?.dataset.category || '';
+                    let targetContainer;
+                    
+                    if (category) {
+                        // Find or create category section in the new section
+                        targetContainer = this.querySelector(`.category-section[data-category="${category}"] .todo-list`);
+                        if (!targetContainer) {
+                            // If category doesn't exist in new section, move to uncategorized
+                            targetContainer = this.querySelector('.todo-list[data-category=""]');
+                        }
+                    } else {
+                        targetContainer = this.querySelector('.todo-list[data-category=""]');
+                    }
+                    
+                    if (targetContainer) {
+                        // Get all todos in the target container
+                        const todos = Array.from(targetContainer.children)
+                            .filter(child => child.classList.contains('todo-item'));
+                        
+                        // Find the position to insert
+                        let insertBefore = null;
+                        for (const todo of todos) {
+                            const rect = todo.getBoundingClientRect();
+                            if (e.clientY < rect.top + rect.height / 2) {
+                                insertBefore = todo;
+                                break;
+                            }
+                        }
+                        
+                        // Insert the dragged element
+                        if (insertBefore) {
+                            targetContainer.insertBefore(draggingElement, insertBefore);
+                        } else {
+                            targetContainer.appendChild(draggingElement);
+                        }
+                        
+                        // Update the order in the backend
+                        const updatedTodos = Array.from(targetContainer.children)
+                            .filter(child => child.classList.contains('todo-item'))
+                            .map(todo => todo.dataset.id);
+                        
+                        // Send both section and order updates
+                        fetch('/move', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                todoId: draggingElement.dataset.id,
+                                newSection: newSection,
+                                ...updateData
+                            })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error updating:', data.error);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            window.location.reload();
+                        });
+                        
+                        // Update order after section change
+                        fetch('/reorder', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ todos: updatedTodos })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error reordering:', data.error);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            window.location.reload();
+                        });
+                    }
+                }
+                
+                // Handle category change (existing code)
+                else if (this.classList.contains('category-section')) {
                     const newCategory = this.dataset.category;
                     const categoryContent = this.querySelector('.category-content .todo-list');
                     if (!categoryContent) return;
@@ -1669,32 +1913,13 @@
                     const todos = Array.from(categoryContent.children)
                         .filter(child => child.classList.contains('todo-item'));
                     
-                    // Separate completed and incomplete tasks
-                    const incompleteTodos = todos.filter(todo => !todo.classList.contains('completed'));
-                    const completedTodos = todos.filter(todo => todo.classList.contains('completed'));
-                    
-                    // Determine if the dragged item is completed
-                    const isDraggingCompleted = draggingElement.classList.contains('completed');
-                    
                     // Find the closest todo to insert before
                     let insertBefore = null;
-                    
-                    if (isDraggingCompleted) {
-                        // For completed tasks, find the first completed task that should come after
-                        insertBefore = completedTodos.find(todo => {
-                            const rect = todo.getBoundingClientRect();
-                            return e.clientY < rect.top + rect.height / 2;
-                        });
-                    } else {
-                        // For incomplete tasks, find the first incomplete task that should come after
-                        insertBefore = incompleteTodos.find(todo => {
-                            const rect = todo.getBoundingClientRect();
-                            return e.clientY < rect.top + rect.height / 2;
-                        });
-                        
-                        // If no incomplete task found to insert before, insert before the first completed task
-                        if (!insertBefore && completedTodos.length > 0) {
-                            insertBefore = completedTodos[0];
+                    for (const todo of todos) {
+                        const rect = todo.getBoundingClientRect();
+                        if (e.clientY < rect.top + rect.height / 2) {
+                            insertBefore = todo;
+                            break;
                         }
                     }
                     
